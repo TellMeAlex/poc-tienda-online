@@ -6,8 +6,9 @@ WORKDIR /app
 # Copy package files
 COPY package*.json ./
 
-# Install dependencies
-RUN npm ci
+# Configure npm to use public registry and install dependencies
+RUN npm config set registry https://registry.npmjs.org/ && \
+    npm ci
 
 # Copy source code
 COPY . .
