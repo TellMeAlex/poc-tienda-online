@@ -6,8 +6,8 @@ WORKDIR /app
 # Copy package files
 COPY package*.json ./
 
-# Install dependencies using custom cache to avoid permission issues
-RUN npm ci --cache .npm-cache
+# Install dependencies
+RUN npm ci
 
 # Copy source code
 COPY . .
