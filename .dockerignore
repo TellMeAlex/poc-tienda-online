@@ -1,0 +1,44 @@
+# Node modules
+node_modules
+npm-debug.log
+
+# Build output
+dist
+dist-ssr
+
+# Git
+.git
+.gitignore
+
+# Custom npm cache
+.npm-cache
+
+# Environment files
+.env
+.env.local
+.env.*.local
+
+# IDE
+.vscode
+.idea
+*.swp
+*.swo
+*.swn
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Screenshots and images
+*.png
+*.jpg
+*.jpeg
+
+# Documentation
+README.md
+CLAUDE.md
+PLAN.md
+
+# Logs
+logs
+*.log
