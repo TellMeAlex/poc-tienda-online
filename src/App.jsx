@@ -14,7 +14,7 @@ function App() {
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
 
   return (
-    <Router>
+    <Router basename="/POC">
       <UserProvider>
         <CartProvider>
           <div className="min-h-screen bg-white">
