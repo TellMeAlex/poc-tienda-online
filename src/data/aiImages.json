@@ -46,5 +46,37 @@
     "imageUrl": "https://images.unsplash.com/photo-1485230895905-ec40ba36b9bc?w=800&h=1000&fit=crop",
     "description": "Usuario vistiendo el pantalón chándal baggy básico en negro",
     "generated": "2024-10-20T13:00:00Z"
+  },
+  {
+    "id": 7,
+    "userId": "user1",
+    "productId": 6,
+    "imageUrl": "https://images.unsplash.com/photo-1529374255404-311a2a4f1fd9?w=800&h=1000&fit=crop",
+    "description": "Usuario vistiendo la camiseta básica oversize en blanco",
+    "generated": "2024-10-21T10:15:00Z"
+  },
+  {
+    "id": 8,
+    "userId": "user1",
+    "productId": 7,
+    "imageUrl": "https://images.unsplash.com/photo-1588117305388-c2631a279f82?w=800&h=1000&fit=crop",
+    "description": "Usuario vistiendo el cargo jogger en beige",
+    "generated": "2024-10-22T15:30:00Z"
+  },
+  {
+    "id": 9,
+    "userId": "user1",
+    "productId": 8,
+    "imageUrl": "https://images.unsplash.com/photo-1576871337622-98d48d1cf531?w=800&h=1000&fit=crop",
+    "description": "Usuario vistiendo la chaqueta denim oversize en azul claro",
+    "generated": "2024-10-23T11:45:00Z"
+  },
+  {
+    "id": 10,
+    "userId": "user1",
+    "productId": 9,
+    "imageUrl": "https://images.unsplash.com/photo-1620799140408-edc6dcb6d633?w=800&h=1000&fit=crop",
+    "description": "Usuario vistiendo la sudadera cuello alto en gris",
+    "generated": "2024-10-24T14:20:00Z"
   }
 ]

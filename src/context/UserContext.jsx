@@ -35,6 +35,12 @@ export const UserProvider = ({ children }) => {
     apiLogout();
     setUser(null);
     setIsAuthenticated(false);
+
+    // Resetear estado de IA al cerrar sesión
+    localStorage.removeItem('ai_status');
+    localStorage.removeItem('ai_start_time');
+    localStorage.removeItem('ai_photo');
+    localStorage.removeItem('ai_completed');
   };
 
   const value = {

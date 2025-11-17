@@ -96,12 +96,16 @@ const AIGallery = () => {
           {images.map((image) => (
             <div key={image.id} className="bg-white rounded-lg overflow-hidden shadow-md hover:shadow-lg transition-shadow">
               {/* Imagen */}
-              <div className="aspect-[3/4] bg-gray-100 overflow-hidden">
+              <div className="aspect-[3/4] bg-gray-100 overflow-hidden relative">
                 <img
                   src={image.imageUrl}
                   alt={image.description}
                   className="w-full h-full object-cover hover:scale-105 transition-transform duration-300"
                 />
+                {/* Banda IA */}
+                <div className="absolute top-3 left-3 bg-gradient-to-r from-purple-600 to-pink-600 text-white px-3 py-1 rounded-full text-xs font-bold shadow-lg">
+                  IA
+                </div>
               </div>
 
               {/* Información */}
