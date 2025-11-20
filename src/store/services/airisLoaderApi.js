@@ -1,6 +1,9 @@
 import { createApi, fetchBaseQuery } from '@reduxjs/toolkit/query/react';
 
-const BASE_URL = 'https://airis-loader-711296505139.europe-southwest1.run.app';
+// Use proxy in development, full URL in production
+const BASE_URL = import.meta.env.DEV
+  ? '/api/loader'
+  : 'https://airis-loader-711296505139.europe-southwest1.run.app';
 
 export const airisLoaderApi = createApi({
   reducerPath: 'airisLoaderApi',
