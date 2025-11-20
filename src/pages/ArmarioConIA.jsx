@@ -13,13 +13,42 @@ const ArmarioConIA = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
+  // Helper function to determine grid item size based on index pattern
+  const getGridItemClass = (index) => {
+    const pattern = index % 10;
+    switch (pattern) {
+      case 0:
+        return 'col-span-1 sm:col-span-2 lg:col-span-2 lg:row-span-2';
+      case 1:
+        return 'col-span-1 sm:col-span-1 lg:col-span-1 lg:row-span-1';
+      case 2:
+        return 'col-span-1 sm:col-span-1 lg:col-span-1 lg:row-span-1';
+      case 3:
+        return 'col-span-1 sm:col-span-1 lg:col-span-1 lg:row-span-2';
+      case 4:
+        return 'col-span-1 sm:col-span-2 lg:col-span-2 lg:row-span-1';
+      case 5:
+        return 'col-span-1 sm:col-span-2 lg:col-span-2 lg:row-span-2';
+      case 6:
+        return 'col-span-1 sm:col-span-1 lg:col-span-1 lg:row-span-1';
+      case 7:
+        return 'col-span-1 sm:col-span-1 lg:col-span-1 lg:row-span-1';
+      case 8:
+        return 'col-span-1 sm:col-span-1 lg:col-span-1 lg:row-span-2';
+      case 9:
+        return 'col-span-1 sm:col-span-2 lg:col-span-2 lg:row-span-2';
+      default:
+        return 'col-span-1 lg:col-span-1';
+    }
+  };
+
   useEffect(() => {
     const loadImages = async () => {
       try {
         setLoading(true);
         
-        // Primero, verificar si hay imágenes generadas en sessionStorage
-        const generatedImagesStr = sessionStorage.getItem('aiGeneratedImages');
+        // Primero, verificar si hay imágenes generadas en localStorage
+        const generatedImagesStr = localStorage.getItem('aiGeneratedImages');
         
         if (generatedImagesStr) {
           const generatedImages = JSON.parse(generatedImagesStr);
@@ -47,8 +76,9 @@ const ArmarioConIA = () => {
           
           setImages(formattedImages);
           
-          // No limpiar el sessionStorage inmediatamente para evitar problemas con Strict Mode (doble ejecución)
-          // sessionStorage.removeItem('aiGeneratedImages');
+          // Las imágenes ahora persisten en localStorage para sobrevivir recargas de página
+          // Si quieres limpiarlas después de cargar, descomenta la siguiente línea:
+          // localStorage.removeItem('aiGeneratedImages');
         } else {
           // Si no hay imágenes generadas, cargar las imágenes del usuario
           const response = await getAIImages(user?.username || 'user1');
@@ -133,11 +163,13 @@ const ArmarioConIA = () => {
               </p>
             </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-              {images.map((image) => (
-                <div key={image.id} className="bg-white border border-gray-200 rounded-lg overflow-hidden hover:shadow-lg transition-shadow">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 auto-rows-[280px] gap-4" style={{ gridAutoFlow: 'dense' }}>
+              {images.map((image, index) => {
+                const gridClass = getGridItemClass(index);
+                return (
+                <div key={image.id} className={`bg-white border border-gray-200 rounded-lg overflow-hidden hover:shadow-lg transition-shadow flex flex-col ${gridClass}`}>
                   {/* Imagen personalizada */}
-                  <div className="relative aspect-[3/4] overflow-hidden">
+                  <div className="relative flex-1 overflow-hidden">
                     <img
                       src={image.imageUrl}
                       alt={image.description}
@@ -180,7 +212,8 @@ const ArmarioConIA = () => {
                     </p>
                   </div>
                 </div>
-              ))}
+              );
+              })}
             </div>
           </>
         )}

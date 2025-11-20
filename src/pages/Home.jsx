@@ -127,8 +127,8 @@ const Home = () => {
       
       // Navegar al armario de IA con las imágenes generadas
       if (validImages.length > 0) {
-        // Guardar las imágenes en sessionStorage para pasarlas a la página del armario
-        sessionStorage.setItem('aiGeneratedImages', JSON.stringify(validImages));
+        // Guardar las imágenes en localStorage para que persistan entre recargas
+        localStorage.setItem('aiGeneratedImages', JSON.stringify(validImages));
         navigate('/armario-con-ia');
       } else {
         alert('No se pudieron generar recomendaciones personalizadas');

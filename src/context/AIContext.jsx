@@ -1,149 +1,186 @@
 import { createContext, useState, useEffect, useCallback } from 'react';
+import { useSelector } from 'react-redux';
+import { selectIsAuthenticated } from '../store/slices/authSlice';
+import { useUploadUserImagesMutation } from '../store/services/airisLoaderApi';
+import { useCustomizeProductByUserMutation, useGetCatalogProductsQuery } from '../store/services/airisApi';
 
 const AIContext = createContext();
 
 const AI_STORAGE_KEYS = {
-  STATUS: 'ai_status',
-  START_TIME: 'ai_start_time',
-  PHOTO: 'ai_photo',
-  COMPLETED: 'ai_completed'
+  STATUS: 'ai_status', // idle | uploading | uploaded | generating | completed
+  PHOTO_UPLOADED: 'ai_photo_uploaded',
+  COMPLETED: 'ai_completed',
+  DISMISSED: 'ai_notification_dismissed'
 };
 
-const AI_PROCESSING_DURATION = 120000; // 2 minutos en milisegundos
-
 export const AIProvider = ({ children }) => {
+  const isAuthenticated = useSelector(selectIsAuthenticated);
   const [aiStatus, setAiStatus] = useState('idle');
   const [uploadedPhoto, setUploadedPhoto] = useState(null);
-  const [progress, setProgress] = useState(0);
-  const [startTime, setStartTime] = useState(null);
+  const [progress, setProgress] = useState({ current: 0, total: 0 });
   const [showNotification, setShowNotification] = useState(true);
+  const [generatedImages, setGeneratedImages] = useState([]);
+
+  // API hooks
+  const [uploadUserImages] = useUploadUserImagesMutation();
+  const [customizeProduct] = useCustomizeProductByUserMutation();
+  
+  // Get catalog products for generation
+  const { data: catalogProducts } = useGetCatalogProductsQuery(undefined, {
+    skip: !isAuthenticated,
+  });
 
   // Cargar estado desde localStorage al montar
   useEffect(() => {
     const storedStatus = localStorage.getItem(AI_STORAGE_KEYS.STATUS);
-    const storedStartTime = localStorage.getItem(AI_STORAGE_KEYS.START_TIME);
-    const storedPhoto = localStorage.getItem(AI_STORAGE_KEYS.PHOTO);
+    const storedPhotoUploaded = localStorage.getItem(AI_STORAGE_KEYS.PHOTO_UPLOADED);
     const storedCompleted = localStorage.getItem(AI_STORAGE_KEYS.COMPLETED);
+    const storedDismissed = localStorage.getItem(AI_STORAGE_KEYS.DISMISSED);
+
+    if (storedDismissed === 'true') {
+      setShowNotification(false);
+      // Si está descartado, no necesitamos cargar el resto del estado visual
+      return;
+    }
 
     if (storedStatus) {
       setAiStatus(storedStatus);
+    }
 
-      if (storedPhoto) {
-        setUploadedPhoto(storedPhoto);
-      }
+    if (storedPhotoUploaded === 'true') {
+      setUploadedPhoto(true);
+    }
 
-      // Si estaba procesando, calcular el progreso actual
-      if (storedStatus === 'processing' && storedStartTime) {
-        const start = parseInt(storedStartTime, 10);
-        const elapsed = Date.now() - start;
-
-        if (elapsed >= AI_PROCESSING_DURATION) {
-          // Ya debería estar completado
-          completeProcessing();
-        } else {
-          setStartTime(start);
-          const currentProgress = Math.floor((elapsed / AI_PROCESSING_DURATION) * 100);
-          setProgress(currentProgress);
-        }
-      }
-
-      // Si ya se completó anteriormente, mostrar como completado
-      if (storedCompleted === 'true') {
-        setAiStatus('completed');
-        setProgress(100);
-      }
+    if (storedCompleted === 'true') {
+      setAiStatus('completed');
     }
   }, []);
-
-  // Efecto para actualizar el progreso cada segundo cuando está procesando
-  useEffect(() => {
-    if (aiStatus === 'processing' && startTime) {
-      const interval = setInterval(() => {
-        const elapsed = Date.now() - startTime;
-        const newProgress = Math.min(Math.floor((elapsed / AI_PROCESSING_DURATION) * 100), 100);
-
-        setProgress(newProgress);
-
-        if (newProgress >= 100) {
-          clearInterval(interval);
-          completeProcessing();
-        }
-      }, 1000); // Actualizar cada segundo
-
-      return () => clearInterval(interval);
-    }
-  }, [aiStatus, startTime]);
 
   const uploadPhoto = useCallback(async (file) => {
     setAiStatus('uploading');
 
-    // Crear URL temporal de la foto
-    const photoUrl = URL.createObjectURL(file);
-    setUploadedPhoto(photoUrl);
+    try {
+      // Crear URL temporal de la foto para preview
+      const photoUrl = URL.createObjectURL(file);
+      setUploadedPhoto(photoUrl);
 
-    // Simular upload al servidor (1-2 segundos)
-    await new Promise(resolve => setTimeout(resolve, 1500));
+      // Upload real a la API como 'socialmedia'
+      await uploadUserImages({
+        userId: 1, // TODO: Get from auth context
+        imagesKind: 'socialmedia',
+        images: [file]
+      }).unwrap();
 
-    // Guardar en localStorage
-    localStorage.setItem(AI_STORAGE_KEYS.PHOTO, photoUrl);
+      // Cambiar a estado 'uploaded'
+      setAiStatus('uploaded');
+      localStorage.setItem(AI_STORAGE_KEYS.STATUS, 'uploaded');
+      localStorage.setItem(AI_STORAGE_KEYS.PHOTO_UPLOADED, 'true');
+    } catch (error) {
+      console.error('Error uploading photo:', error);
+      setAiStatus('idle');
+      throw error;
+    }
+  }, [uploadUserImages]);
 
-    // Iniciar procesamiento automáticamente
-    startProcessing();
-  }, []);
+  const generateRecommendations = useCallback(async () => {
+    if (!catalogProducts || catalogProducts.length === 0) {
+      throw new Error('No hay productos disponibles para personalizar');
+    }
 
-  const startProcessing = useCallback(() => {
-    const now = Date.now();
-    setAiStatus('processing');
-    setStartTime(now);
-    setProgress(0);
+    setAiStatus('generating');
+    setProgress({ current: 0, total: catalogProducts.length });
+    setGeneratedImages([]);
 
-    // Guardar en localStorage
-    localStorage.setItem(AI_STORAGE_KEYS.STATUS, 'processing');
-    localStorage.setItem(AI_STORAGE_KEYS.START_TIME, now.toString());
-  }, []);
+    const images = [];
 
-  const completeProcessing = useCallback(() => {
+    try {
+      // Personalizar cada producto en paralelo
+      const promises = catalogProducts.map(async (product) => {
+        try {
+          const result = await customizeProduct(product.product_id).unwrap();
+          
+          // La API devuelve las imágenes en product_images_urls
+          const productImages = result.product_images_urls || result.images || [];
+          const lastImage = productImages[productImages.length - 1] || productImages[0];
+          
+          setProgress(prev => ({ ...prev, current: prev.current + 1 }));
+          
+          return {
+            productId: product.product_id,
+            productName: product.product_name,
+            image: lastImage,
+            originalProduct: product
+          };
+        } catch (err) {
+          console.error(`Error personalizando producto ${product.product_id}:`, err);
+          setProgress(prev => ({ ...prev, current: prev.current + 1 }));
+          return null;
+        }
+      });
+
+      const results = await Promise.all(promises);
+      const validImages = results.filter(r => r !== null);
+      
+      setGeneratedImages(validImages);
+      
+      // Guardar las imágenes en localStorage para que persistan entre recargas
+      if (validImages.length > 0) {
+        localStorage.setItem('aiGeneratedImages', JSON.stringify(validImages));
+        completeProcessing();
+      } else {
+        throw new Error('No se pudieron generar recomendaciones personalizadas');
+      }
+    } catch (err) {
+      console.error('Error generando recomendaciones:', err);
+      setAiStatus('uploaded'); // Volver al estado anterior
+      throw err;
+    }
+  }, [catalogProducts, customizeProduct]);
+
+  const completeProcessing = (images) => {
     setAiStatus('completed');
-    setProgress(100);
-
-    // Guardar en localStorage
+    setGeneratedImages(images);
+    
+    // Guardar en sessionStorage para la página de resultados
+    sessionStorage.setItem('ai_generated_images', JSON.stringify(images));
+    
+    // Persistir estado completado
     localStorage.setItem(AI_STORAGE_KEYS.STATUS, 'completed');
     localStorage.setItem(AI_STORAGE_KEYS.COMPLETED, 'true');
-    localStorage.removeItem(AI_STORAGE_KEYS.START_TIME);
-  }, []);
+  };
 
   const dismissNotification = useCallback(() => {
     setShowNotification(false);
+    localStorage.setItem(AI_STORAGE_KEYS.DISMISSED, 'true');
   }, []);
 
   const resetAIState = useCallback(() => {
     setAiStatus('idle');
     setUploadedPhoto(null);
-    setProgress(0);
-    setStartTime(null);
+    setProgress({ current: 0, total: 0 });
+    setGeneratedImages([]);
     setShowNotification(true);
-
+    
     // Limpiar localStorage
-    localStorage.removeItem(AI_STORAGE_KEYS.STATUS);
-    localStorage.removeItem(AI_STORAGE_KEYS.START_TIME);
-    localStorage.removeItem(AI_STORAGE_KEYS.PHOTO);
-    localStorage.removeItem(AI_STORAGE_KEYS.COMPLETED);
+    localStorage.removeItem(AI_STORAGE_KEYS.DISMISSED);
+    sessionStorage.removeItem('ai_generated_images');
   }, []);
 
-  const value = {
-    aiStatus,
-    uploadedPhoto,
-    progress,
-    showNotification,
-    uploadPhoto,
-    startProcessing,
-    completeProcessing,
-    dismissNotification,
-    resetAIState,
-    isAICompleted: aiStatus === 'completed' || localStorage.getItem(AI_STORAGE_KEYS.COMPLETED) === 'true'
-  };
-
-  return <AIContext.Provider value={value}>{children}</AIContext.Provider>;
+  return (
+    <AIContext.Provider value={{
+      aiStatus,
+      uploadedPhoto,
+      progress,
+      showNotification,
+      generatedImages,
+      uploadPhoto,
+      generateRecommendations,
+      resetAIState,
+      dismissNotification
+    }}>
+      {children}
+    </AIContext.Provider>
+  );
 };
 
 export default AIContext;
