@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
 
-const ProductCard = ({ product }) => {
+const ProductCard = ({ product, heightClass = 'h-[350px]', index = 0 }) => {
   const [isFavorite, setIsFavorite] = useState(false);
 
   // Adapt to new API structure
@@ -21,20 +21,23 @@ const ProductCard = ({ product }) => {
   return (
     <Link
       to={`/product/${productId}`}
-      className="group block"
+      className="group block break-inside-avoid"
     >
-      {/* Imagen */}
-      <div className="relative aspect-[3/4] bg-gray-200 overflow-hidden mb-2">
+      {/* Imagen con overlay y contenido */}
+      <div className={`relative bg-gray-200 overflow-hidden rounded-lg shadow-sm hover:shadow-2xl transition-shadow duration-300 ${heightClass}`}>
         <img
           src={productImage}
           alt={productName}
-          className="w-full h-full object-cover"
+          className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700 ease-out"
           loading="lazy"
         />
 
+        {/* Gradient overlay - appears on hover */}
+        <div className="absolute inset-0 bg-gradient-to-t from-black via-black/20 to-transparent opacity-0 group-hover:opacity-80 transition-opacity duration-300"></div>
+
         {/* Badge de ranking - solo si hay */}
         {productRank > 0 && (
-          <div className="absolute top-2 left-2">
+          <div className="absolute top-3 left-3 z-10">
             <span className="bg-black text-white text-xs px-2 py-1 rounded">
               ⭐ {productRank}
             </span>
@@ -44,11 +47,11 @@ const ProductCard = ({ product }) => {
         {/* Botón de favoritos */}
         <button
           onClick={handleToggleFavorite}
-          className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity bg-white rounded-full p-1"
+          className="absolute top-3 right-3 z-10 opacity-0 group-hover:opacity-100 transition-opacity duration-300 bg-white hover:bg-gray-100 rounded-full p-2 shadow-lg"
           aria-label={isFavorite ? 'Eliminar de favoritos' : 'Añadir a favoritos'}
         >
           <svg
-            className={`w-6 h-6 ${isFavorite ? 'fill-red-500' : 'fill-none stroke-black stroke-2'}`}
+            className={`w-5 h-5 ${isFavorite ? 'fill-red-500' : 'fill-none stroke-black stroke-2'}`}
             viewBox="0 0 24 24"
           >
             <path
@@ -56,38 +59,38 @@ const ProductCard = ({ product }) => {
             />
           </svg>
         </button>
-      </div>
 
-      {/* Información del producto */}
-      <div>
-        {/* Nombre */}
-        <h3 className="text-sm mb-1 line-clamp-2">
-          {productName}
-        </h3>
+        {/* Contenido que aparece en hover */}
+        <div className="absolute inset-0 flex flex-col justify-end p-4 opacity-0 group-hover:opacity-100 transition-opacity duration-300">
+          {/* Nombre */}
+          <h3 className="text-white text-sm font-semibold mb-1 line-clamp-2 transform translate-y-2 group-hover:translate-y-0 transition-transform duration-500"
+            style={{ animationDelay: '100ms' }}>
+            {productName}
+          </h3>
 
-        {/* Precio */}
-        <div className="mb-2">
-          <span className="font-semibold text-sm">{productPrice.toFixed(2)} €</span>
-        </div>
-
-        {/* Características */}
-        {product.product_characteristics && product.product_characteristics.length > 0 && (
-          <div className="flex flex-wrap gap-1">
-            {product.product_characteristics.slice(0, 3).map((char, index) => (
-              <span
-                key={index}
-                className="text-xs text-gray-500 bg-gray-100 px-2 py-0.5 rounded"
-              >
-                {char}
-              </span>
-            ))}
-            {product.product_characteristics.length > 3 && (
-              <span className="text-xs text-gray-500">
-                +{product.product_characteristics.length - 3}
-              </span>
-            )}
+          {/* Precio */}
+          <div className="flex items-center justify-between mb-2">
+            <span className="text-white font-bold text-base transform translate-y-2 group-hover:translate-y-0 transition-transform duration-500"
+              style={{ animationDelay: '200ms' }}>
+              {productPrice.toFixed(2)} €
+            </span>
           </div>
-        )}
+
+          {/* Características en hover */}
+          {product.product_characteristics && product.product_characteristics.length > 0 && (
+            <div className="flex flex-wrap gap-1 transform translate-y-2 group-hover:translate-y-0 transition-transform duration-500"
+              style={{ animationDelay: '300ms' }}>
+              {product.product_characteristics.slice(0, 2).map((char, idx) => (
+                <span
+                  key={idx}
+                  className="text-xs text-white bg-white/20 backdrop-blur-sm px-2 py-0.5 rounded"
+                >
+                  {char}
+                </span>
+              ))}
+            </div>
+          )}
+        </div>
       </div>
     </Link>
   );

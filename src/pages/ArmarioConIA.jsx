@@ -13,33 +13,21 @@ const ArmarioConIA = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
-  // Helper function to determine grid item size based on index pattern
-  const getGridItemClass = (index) => {
-    const pattern = index % 10;
-    switch (pattern) {
-      case 0:
-        return 'col-span-1 sm:col-span-2 lg:col-span-2 lg:row-span-2';
-      case 1:
-        return 'col-span-1 sm:col-span-1 lg:col-span-1 lg:row-span-1';
-      case 2:
-        return 'col-span-1 sm:col-span-1 lg:col-span-1 lg:row-span-1';
-      case 3:
-        return 'col-span-1 sm:col-span-1 lg:col-span-1 lg:row-span-2';
-      case 4:
-        return 'col-span-1 sm:col-span-2 lg:col-span-2 lg:row-span-1';
-      case 5:
-        return 'col-span-1 sm:col-span-2 lg:col-span-2 lg:row-span-2';
-      case 6:
-        return 'col-span-1 sm:col-span-1 lg:col-span-1 lg:row-span-1';
-      case 7:
-        return 'col-span-1 sm:col-span-1 lg:col-span-1 lg:row-span-1';
-      case 8:
-        return 'col-span-1 sm:col-span-1 lg:col-span-1 lg:row-span-2';
-      case 9:
-        return 'col-span-1 sm:col-span-2 lg:col-span-2 lg:row-span-2';
-      default:
-        return 'col-span-1 lg:col-span-1';
-    }
+  // Helper function to determine height based on index pattern for masonry effect
+  const getHeightClass = (index) => {
+    const patterns = [
+      'h-[450px]',   // Tall
+      'h-[380px]',   // Medium tall
+      'h-[320px]',   // Medium
+      'h-[400px]',   // Tall-ish
+      'h-[350px]',   // Medium
+      'h-[420px]',   // Tall
+      'h-[340px]',   // Medium short
+      'h-[390px]',   // Medium tall
+      'h-[360px]',   // Medium
+      'h-[430px]',   // Tall
+    ];
+    return patterns[index % patterns.length];
   };
 
   useEffect(() => {
@@ -108,7 +96,7 @@ const ArmarioConIA = () => {
     <div className="min-h-screen bg-white">
       {/* Hero Section */}
       <div className="bg-black text-white py-12 px-4">
-        <div className="max-w-7xl mx-auto">
+        <div className="max-w-[1600px] mx-auto">
           <div className="flex items-center gap-3 mb-4">
             <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 3v4M3 5h4M6 17v4m-2-2h4m5-16l2.286 6.857L21 12l-5.714 2.143L13 21l-2.286-6.857L5 12l5.714-2.143L13 3z" />
@@ -122,7 +110,7 @@ const ArmarioConIA = () => {
       </div>
 
       {/* Content */}
-      <div className="max-w-7xl mx-auto px-4 py-8">
+      <div className="max-w-[1600px] mx-auto px-4 py-8">
         {loading && (
           <div className="flex flex-col items-center justify-center py-20">
             <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-black mb-4"></div>
@@ -163,53 +151,60 @@ const ArmarioConIA = () => {
               </p>
             </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 auto-rows-[280px] gap-4" style={{ gridAutoFlow: 'dense' }}>
+            <div className="columns-1 sm:columns-2 lg:columns-4 gap-4 md:gap-6 space-y-4 md:space-y-6">
               {images.map((image, index) => {
-                const gridClass = getGridItemClass(index);
+                const heightClass = getHeightClass(index);
                 return (
-                <div key={image.id} className={`bg-white border border-gray-200 rounded-lg overflow-hidden hover:shadow-lg transition-shadow flex flex-col ${gridClass}`}>
+                <div key={image.id} className={`group bg-white rounded-lg overflow-hidden shadow-sm hover:shadow-2xl transition-shadow duration-300 break-inside-avoid ${heightClass}`}>
                   {/* Imagen personalizada */}
-                  <div className="relative flex-1 overflow-hidden">
+                  <div className="relative w-full h-full overflow-hidden">
                     <img
                       src={image.imageUrl}
                       alt={image.description}
-                      className="w-full h-full object-cover"
+                      className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700 ease-out"
                     />
-                  </div>
 
-                  {/* Información */}
-                  <div className="p-4">
-                    <p className="text-sm text-gray-600 mb-3">{image.description}</p>
+                    {/* Gradient overlay - appears on hover */}
+                    <div className="absolute inset-0 bg-gradient-to-t from-black via-black/20 to-transparent opacity-0 group-hover:opacity-80 transition-opacity duration-300"></div>
 
-                    {image.product && (
-                      <div className="border-t pt-3">
-                        <h3 className="font-semibold text-sm mb-1">{image.product.name}</h3>
-                        <p className="text-lg font-bold mb-3">
-                          {image.product.discount > 0 ? (
-                            <>
-                              <span className="text-red-600">
-                                {(image.product.price * (1 - image.product.discount / 100)).toFixed(2)} €
-                              </span>
-                              <span className="text-gray-400 line-through ml-2 text-sm">
-                                {image.product.price.toFixed(2)} €
-                              </span>
-                            </>
-                          ) : (
-                            <span>{image.product.price.toFixed(2)} €</span>
-                          )}
-                        </p>
-                        <Link
-                          to={`/product/${image.product.id}`}
-                          className="block w-full bg-black text-white text-center py-2 rounded-md hover:bg-gray-800 transition-colors text-sm"
-                        >
-                          Ver producto
-                        </Link>
-                      </div>
-                    )}
+                    {/* Información que aparece en hover */}
+                    <div className="absolute inset-0 flex flex-col justify-end p-4 opacity-0 group-hover:opacity-100 transition-opacity duration-300">
+                      <p className="text-white text-sm mb-2 transform translate-y-2 group-hover:translate-y-0 transition-transform duration-500"
+                        style={{ animationDelay: '100ms' }}>
+                        {image.description}
+                      </p>
 
-                    <p className="text-xs text-gray-400 mt-3">
-                      Generado el {new Date(image.generated).toLocaleDateString('es-ES')}
-                    </p>
+                      {image.product && (
+                        <>
+                          <h3 className="text-white font-semibold text-sm mb-1 transform translate-y-2 group-hover:translate-y-0 transition-transform duration-500"
+                            style={{ animationDelay: '200ms' }}>
+                            {image.product.name}
+                          </h3>
+                          <p className="text-white font-bold text-base mb-2 transform translate-y-2 group-hover:translate-y-0 transition-transform duration-500"
+                            style={{ animationDelay: '300ms' }}>
+                            {image.product.discount > 0 ? (
+                              <>
+                                <span className="text-white">
+                                  {(image.product.price * (1 - image.product.discount / 100)).toFixed(2)} €
+                                </span>
+                                <span className="text-gray-300 line-through ml-2 text-sm">
+                                  {image.product.price.toFixed(2)} €
+                                </span>
+                              </>
+                            ) : (
+                              <span>{image.product.price.toFixed(2)} €</span>
+                            )}
+                          </p>
+                          <Link
+                            to={`/product/${image.product.id}`}
+                            className="block w-full bg-white text-black text-center py-2 rounded-md hover:bg-gray-100 transition-colors text-sm font-semibold transform translate-y-2 group-hover:translate-y-0 transition-transform duration-500"
+                            style={{ animationDelay: '400ms' }}
+                          >
+                            Ver producto
+                          </Link>
+                        </>
+                      )}
+                    </div>
                   </div>
                 </div>
               );
