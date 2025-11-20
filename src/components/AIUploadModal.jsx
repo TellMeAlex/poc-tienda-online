@@ -2,9 +2,10 @@ import { useState, useEffect } from 'react';
 import { useAI } from '../hooks/useAI';
 
 const AIUploadModal = ({ isOpen, onClose }) => {
-  const { generateRecommendations, aiStatus } = useAI();
+  const { uploadPhoto, generateRecommendations, aiStatus } = useAI();
   const [selectedFile, setSelectedFile] = useState(null);
   const [previewUrl, setPreviewUrl] = useState(null);
+  const [isUploading, setIsUploading] = useState(false);
   const [uploadSuccess, setUploadSuccess] = useState(false);
   const [error, setError] = useState(null);
 
@@ -13,6 +14,7 @@ const AIUploadModal = ({ isOpen, onClose }) => {
     if (!isOpen) {
       setSelectedFile(null);
       setPreviewUrl(null);
+      setIsUploading(false);
       setUploadSuccess(false);
       setError(null);
     }
@@ -34,13 +36,21 @@ const AIUploadModal = ({ isOpen, onClose }) => {
     }
   };
 
-  // Simular subida exitosa (primera iteración)
-  const handleSimulateUpload = () => {
+  const handleUpload = async () => {
     if (!selectedFile) return;
-    
-    // Simular éxito inmediato
-    setUploadSuccess(true);
+
+    setIsUploading(true);
     setError(null);
+    
+    try {
+      await uploadPhoto(selectedFile);
+      setUploadSuccess(true);
+    } catch (error) {
+      console.error('Error uploading photo:', error);
+      setError('Error al subir la foto. Por favor, inténtalo de nuevo.');
+    } finally {
+      setIsUploading(false);
+    }
   };
 
   const handleGenerateRecommendations = async () => {
@@ -57,6 +67,7 @@ const AIUploadModal = ({ isOpen, onClose }) => {
   const handleClose = () => {
     setSelectedFile(null);
     setPreviewUrl(null);
+    setIsUploading(false);
     setUploadSuccess(false);
     setError(null);
     onClose();
@@ -71,6 +82,7 @@ const AIUploadModal = ({ isOpen, onClose }) => {
         <button
           onClick={handleClose}
           className="absolute top-4 right-4 text-gray-400 hover:text-gray-600"
+          disabled={isUploading}
         >
           <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
@@ -126,6 +138,7 @@ const AIUploadModal = ({ isOpen, onClose }) => {
                   className="hidden"
                   accept="image/*"
                   onChange={handleFileSelect}
+                  disabled={isUploading}
                 />
               </label>
             </div>
@@ -134,16 +147,24 @@ const AIUploadModal = ({ isOpen, onClose }) => {
             <div className="flex gap-3">
               <button
                 onClick={handleClose}
-                className="flex-1 px-4 py-3 text-black border border-gray-300 rounded-md hover:bg-gray-50 transition-colors"
+                className="flex-1 px-4 py-3 text-black border border-gray-300 rounded-md hover:bg-gray-50 transition-colors disabled:opacity-50"
+                disabled={isUploading}
               >
                 Cancelar
               </button>
               <button
-                onClick={handleSimulateUpload}
-                disabled={!selectedFile}
+                onClick={handleUpload}
+                disabled={!selectedFile || isUploading}
                 className="flex-1 px-4 py-3 bg-black text-white rounded-md hover:bg-gray-800 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center"
               >
-                Simular Subida
+                {isUploading ? (
+                  <>
+                    <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white mr-2"></div>
+                    Subiendo...
+                  </>
+                ) : (
+                  'Subir foto'
+                )}
               </button>
             </div>
           </>

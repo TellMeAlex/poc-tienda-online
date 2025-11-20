@@ -1,6 +1,7 @@
 import { createContext, useState, useEffect, useCallback } from 'react';
 import { useSelector } from 'react-redux';
-import { selectIsAuthenticated } from '../store/slices/authSlice';
+import { jwtDecode } from 'jwt-decode';
+import { selectIsAuthenticated, selectCurrentToken } from '../store/slices/authSlice';
 import { useUploadUserImagesMutation } from '../store/services/airisLoaderApi';
 import { useCustomizeProductByUserMutation, useGetCatalogProductsQuery } from '../store/services/airisApi';
 
@@ -15,6 +16,7 @@ const AI_STORAGE_KEYS = {
 
 export const AIProvider = ({ children }) => {
   const isAuthenticated = useSelector(selectIsAuthenticated);
+  const token = useSelector(selectCurrentToken);
   const [aiStatus, setAiStatus] = useState('idle');
   const [uploadedPhoto, setUploadedPhoto] = useState(null);
   const [progress, setProgress] = useState({ current: 0, total: 0 });
@@ -56,8 +58,26 @@ export const AIProvider = ({ children }) => {
     }
   }, []);
 
+  const getUserIdFromToken = useCallback(() => {
+    if (!token) return null;
+    try {
+      const decoded = jwtDecode(token);
+      return decoded.user_id || decoded.sub || decoded.id;
+    } catch (error) {
+      console.error('Error decoding token:', error);
+      return null;
+    }
+  }, [token]);
+
   const uploadPhoto = useCallback(async (file) => {
     setAiStatus('uploading');
+    const userId = getUserIdFromToken();
+
+    if (!userId) {
+      console.error('No user ID found in token');
+      setAiStatus('idle');
+      throw new Error('Usuario no identificado');
+    }
 
     try {
       // Crear URL temporal de la foto para preview
@@ -66,7 +86,7 @@ export const AIProvider = ({ children }) => {
 
       // Upload real a la API como 'socialmedia'
       await uploadUserImages({
-        userId: 1, // TODO: Get from auth context
+        userId: userId,
         imagesKind: 'socialmedia',
         images: [file]
       }).unwrap();
@@ -80,11 +100,16 @@ export const AIProvider = ({ children }) => {
       setAiStatus('idle');
       throw error;
     }
-  }, [uploadUserImages]);
+  }, [uploadUserImages, getUserIdFromToken]);
 
   const generateRecommendations = useCallback(async () => {
     if (!catalogProducts || catalogProducts.length === 0) {
       throw new Error('No hay productos disponibles para personalizar');
+    }
+
+    const userId = getUserIdFromToken();
+    if (!userId) {
+      throw new Error('Usuario no identificado');
     }
 
     setAiStatus('generating');
@@ -97,7 +122,11 @@ export const AIProvider = ({ children }) => {
       // Personalizar cada producto en paralelo
       const promises = catalogProducts.map(async (product) => {
         try {
-          const result = await customizeProduct(product.product_id).unwrap();
+          // Usar el userId real
+          const result = await customizeProduct({ 
+            productId: product.product_id, 
+            userId: userId 
+          }).unwrap();
           
           // La API devuelve las imágenes en product_images_urls
           const productImages = result.product_images_urls || result.images || [];

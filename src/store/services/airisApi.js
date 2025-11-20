@@ -46,10 +46,10 @@ export const airisApi = createApi({
 
     // Customize product by user (personalized images)
     customizeProductByUser: builder.mutation({
-      query: (productId) => ({
+      query: ({ productId, userId }) => ({
         url: '/operation/customize_product_by_user',
         method: 'POST',
-        params: { product_id: productId, user_id: 1 },
+        params: { product_id: productId, user_id: userId },
       }),
       invalidatesTags: ['Products'],
     }),
