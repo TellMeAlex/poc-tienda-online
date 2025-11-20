@@ -1,10 +1,12 @@
 import { useState, useEffect } from 'react';
 import { Link, Navigate } from 'react-router-dom';
-import { useUser } from '../context/UserContext';
+import { useSelector } from 'react-redux';
+import { selectIsAuthenticated, selectCurrentUser } from '../store/slices/authSlice';
 import { getAIImages } from '../services/api';
 
 const AIGallery = () => {
-  const { isAuthenticated, user } = useUser();
+  const isAuthenticated = useSelector(selectIsAuthenticated);
+  const user = useSelector(selectCurrentUser);
   const [images, setImages] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);

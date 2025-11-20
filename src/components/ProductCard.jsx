@@ -4,9 +4,13 @@ import { Link } from 'react-router-dom';
 const ProductCard = ({ product }) => {
   const [isFavorite, setIsFavorite] = useState(false);
 
-  const finalPrice = product.discount
-    ? product.price * (1 - product.discount / 100)
-    : product.price;
+  // Adapt to new API structure
+  const productId = product.product_id;
+  const productName = product.product_name;
+  const productPrice = product.product_price;
+  const productImages = product.product_images_urls || [];
+  const productImage = productImages[0] || '/placeholder-image.jpg';
+  const productRank = product.product_rank || 0;
 
   const handleToggleFavorite = (e) => {
     e.preventDefault();
@@ -16,22 +20,23 @@ const ProductCard = ({ product }) => {
 
   return (
     <Link
-      to={`/product/${product.id}`}
+      to={`/product/${productId}`}
       className="group block"
     >
       {/* Imagen */}
       <div className="relative aspect-[3/4] bg-gray-200 overflow-hidden mb-2">
         <img
-          src={product.image}
-          alt={product.name}
+          src={productImage}
+          alt={productName}
           className="w-full h-full object-cover"
+          loading="lazy"
         />
 
-        {/* Badge de descuento - solo si hay */}
-        {product.discount > 0 && (
+        {/* Badge de ranking - solo si hay */}
+        {productRank > 0 && (
           <div className="absolute top-2 left-2">
-            <span className="bg-white text-black text-xs px-2 py-1">
-              Pack hasta -{product.discount}%
+            <span className="bg-black text-white text-xs px-2 py-1 rounded">
+              ⭐ {productRank}
             </span>
           </div>
         )}
@@ -39,7 +44,7 @@ const ProductCard = ({ product }) => {
         {/* Botón de favoritos */}
         <button
           onClick={handleToggleFavorite}
-          className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity"
+          className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity bg-white rounded-full p-1"
           aria-label={isFavorite ? 'Eliminar de favoritos' : 'Añadir a favoritos'}
         >
           <svg
@@ -57,28 +62,28 @@ const ProductCard = ({ product }) => {
       <div>
         {/* Nombre */}
         <h3 className="text-sm mb-1 line-clamp-2">
-          {product.name}
+          {productName}
         </h3>
 
         {/* Precio */}
         <div className="mb-2">
-          <span className="font-semibold text-sm">{finalPrice.toFixed(2)} €</span>
+          <span className="font-semibold text-sm">{productPrice.toFixed(2)} €</span>
         </div>
 
-        {/* Colores disponibles */}
-        {product.colorCodes && product.colorCodes.length > 0 && (
-          <div className="flex items-center gap-1">
-            {product.colorCodes.slice(0, 4).map((color, index) => (
-              <div
+        {/* Características */}
+        {product.product_characteristics && product.product_characteristics.length > 0 && (
+          <div className="flex flex-wrap gap-1">
+            {product.product_characteristics.slice(0, 3).map((char, index) => (
+              <span
                 key={index}
-                className="w-3 h-3 rounded-full border border-gray-400"
-                style={{ backgroundColor: color }}
-                title={product.colors[index]}
-              />
+                className="text-xs text-gray-500 bg-gray-100 px-2 py-0.5 rounded"
+              >
+                {char}
+              </span>
             ))}
-            {product.colors.length > 4 && (
+            {product.product_characteristics.length > 3 && (
               <span className="text-xs text-gray-500">
-                +{product.colors.length - 4}
+                +{product.product_characteristics.length - 3}
               </span>
             )}
           </div>

@@ -1,17 +1,17 @@
+import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useCart } from '../context/CartContext';
+import { useSelector, useDispatch } from 'react-redux';
+import { selectCartItems, selectCartTotal, removeFromCart, updateQuantity } from '../store/slices/cartSlice';
 
 const Cart = () => {
-  const {
-    items,
-    isCartOpen,
-    closeCart,
-    removeFromCart,
-    updateQuantity,
-    getTotal
-  } = useCart();
-
+  const [isCartOpen, setIsCartOpen] = useState(false);
+  const items = useSelector(selectCartItems);
+  const total = useSelector(selectCartTotal);
+  const dispatch = useDispatch();
   const navigate = useNavigate();
+
+  const closeCart = () => setIsCartOpen(false);
+  const openCart = () => setIsCartOpen(true);
 
   const handleCheckout = () => {
     closeCart();
@@ -19,17 +19,28 @@ const Cart = () => {
   };
 
   const handleQuantityChange = (item, newQuantity) => {
-    updateQuantity(item.id, newQuantity, item.selectedSize, item.selectedColor);
+    if (newQuantity <= 0) {
+      dispatch(removeFromCart({ 
+        productId: item.product.product_id, 
+        size: item.size, 
+        color: item.color 
+      }));
+    } else {
+      dispatch(updateQuantity({ 
+        productId: item.product.product_id, 
+        quantity: newQuantity, 
+        size: item.size, 
+        color: item.color 
+      }));
+    }
   };
 
   const handleRemove = (item) => {
-    removeFromCart(item.id, item.selectedSize, item.selectedColor);
-  };
-
-  const getItemPrice = (item) => {
-    return item.discount
-      ? item.price * (1 - item.discount / 100)
-      : item.price;
+    dispatch(removeFromCart({ 
+      productId: item.product.product_id, 
+      size: item.size, 
+      color: item.color 
+    }));
   };
 
   return (
@@ -77,16 +88,17 @@ const Cart = () => {
           ) : (
             <div className="space-y-4">
               {items.map((item) => {
-                const itemPrice = getItemPrice(item);
+                const itemPrice = item.product.product_price;
                 const itemTotal = itemPrice * item.quantity;
+                const imageUrl = item.product.product_images_urls?.[0] || '/placeholder-image.jpg';
 
                 return (
-                  <div key={`${item.id}-${item.selectedSize}-${item.selectedColor}`} className="flex gap-4 border-b border-gray-200 pb-4">
+                  <div key={`${item.product.product_id}-${item.size}-${item.color}`} className="flex gap-4 border-b border-gray-200 pb-4">
                     {/* Imagen */}
                     <div className="w-20 h-24 flex-shrink-0 bg-gray-100 rounded overflow-hidden">
                       <img
-                        src={item.image}
-                        alt={item.name}
+                        src={imageUrl}
+                        alt={item.product.product_name}
                         className="w-full h-full object-cover"
                       />
                     </div>
@@ -94,24 +106,19 @@ const Cart = () => {
                     {/* Información */}
                     <div className="flex-1 min-w-0">
                       <h3 className="font-medium text-sm mb-1 line-clamp-2">
-                        {item.name}
+                        {item.product.product_name}
                       </h3>
 
                       {/* Talla y color seleccionados */}
                       <div className="text-xs text-gray-500 mb-2">
-                        {item.selectedSize && <span>Talla: {item.selectedSize}</span>}
-                        {item.selectedSize && item.selectedColor && <span> | </span>}
-                        {item.selectedColor && <span>Color: {item.selectedColor}</span>}
+                        {item.size && <span>Talla: {item.size}</span>}
+                        {item.size && item.color && <span> | </span>}
+                        {item.color && <span>Color: {item.color}</span>}
                       </div>
 
                       {/* Precio */}
                       <div className="flex items-center gap-2 mb-2">
                         <span className="font-bold text-sm">{itemPrice.toFixed(2)} €</span>
-                        {item.discount > 0 && (
-                          <span className="text-xs text-gray-500 line-through">
-                            {item.price.toFixed(2)} €
-                          </span>
-                        )}
                       </div>
 
                       {/* Cantidad y eliminar */}
@@ -166,7 +173,7 @@ const Cart = () => {
             {/* Subtotal */}
             <div className="flex justify-between items-center text-lg font-bold">
               <span>Total:</span>
-              <span>{getTotal().toFixed(2)} €</span>
+              <span>{total.toFixed(2)} €</span>
             </div>
 
             {/* Botón de checkout */}
@@ -191,4 +198,6 @@ const Cart = () => {
   );
 };
 
+// Export the component and the toggle function
 export default Cart;
+export { Cart };

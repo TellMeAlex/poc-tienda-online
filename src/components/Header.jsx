@@ -1,17 +1,24 @@
 import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { useCart } from '../context/CartContext';
-import { useUser } from '../context/UserContext';
+import { useSelector, useDispatch } from 'react-redux';
+import { selectCartItemsCount } from '../store/slices/cartSlice';
+import { selectIsAuthenticated, selectCurrentUser, setCredentials, logout as logoutAction } from '../store/slices/authSlice';
+import { useLoginMutation } from '../store/services/airisApi';
 
 const Header = ({ onMenuClick }) => {
   const [searchQuery, setSearchQuery] = useState('');
   const [showLoginModal, setShowLoginModal] = useState(false);
   const [showSearchBar, setShowSearchBar] = useState(false);
-  const [username, setUsername] = useState('');
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
 
-  const { getTotalItems, toggleCart } = useCart();
-  const { isAuthenticated, user, login, logout } = useUser();
+  const dispatch = useDispatch();
+  const cartItemsCount = useSelector(selectCartItemsCount);
+  const isAuthenticated = useSelector(selectIsAuthenticated);
+  const user = useSelector(selectCurrentUser);
   const navigate = useNavigate();
+  
+  const [login, { isLoading: isLoggingIn }] = useLoginMutation();
 
   const handleSearch = (e) => {
     e.preventDefault();
@@ -24,18 +31,28 @@ const Header = ({ onMenuClick }) => {
 
   const handleLogin = async (e) => {
     e.preventDefault();
-    if (username.trim()) {
-      const result = await login(username.trim());
-      if (result.success) {
+    if (email.trim() && password.trim()) {
+      try {
+        const result = await login({ email: email.trim(), password: password.trim() }).unwrap();
+        // Assuming the API returns user data and token
+        dispatch(setCredentials({ user: result.user || { email }, token: result.access_token || result.token }));
         setShowLoginModal(false);
-        setUsername('');
+        setEmail('');
+        setPassword('');
+      } catch (error) {
+        console.error('Login failed:', error);
+        alert('Error al iniciar sesión. Verifica tus credenciales.');
       }
     }
   };
 
   const handleLogout = () => {
-    logout();
+    dispatch(logoutAction());
   };
+
+  // Cart toggle state
+  const [isCartOpen, setIsCartOpen] = useState(false);
+  const toggleCart = () => setIsCartOpen(!isCartOpen);
 
   return (
     <>
@@ -58,7 +75,7 @@ const Header = ({ onMenuClick }) => {
             {/* Centro - Logo */}
             <div className="flex justify-center">
               <Link to="/" className="text-2xl font-bold tracking-widest">
-                ALEJANDRIA
+                AIRIS
               </Link>
             </div>
 
@@ -78,7 +95,7 @@ const Header = ({ onMenuClick }) => {
               <div className="relative">
                 {isAuthenticated ? (
                   <div className="flex items-center space-x-2">
-                    <span className="hidden sm:inline text-sm">{user?.username}</span>
+                    <span className="hidden sm:inline text-sm">{user?.email || user?.username}</span>
                     <button
                       onClick={handleLogout}
                       className="p-2 hover:bg-gray-100 rounded-md"
@@ -111,9 +128,9 @@ const Header = ({ onMenuClick }) => {
                 <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z" />
                 </svg>
-                {getTotalItems() > 0 && (
+                {cartItemsCount > 0 && (
                   <span className="absolute -top-1 -right-1 bg-black text-white text-xs rounded-full w-5 h-5 flex items-center justify-center">
-                    {getTotalItems()}
+                    {cartItemsCount}
                   </span>
                 )}
               </button>
@@ -171,25 +188,70 @@ const Header = ({ onMenuClick }) => {
             </div>
             <form onSubmit={handleLogin}>
               <div className="mb-4">
-                <label htmlFor="username" className="block text-sm font-medium text-gray-700 mb-2">
-                  Nombre de usuario
+                <label htmlFor="email" className="block text-sm font-medium text-gray-700 mb-2">
+                  Email
                 </label>
                 <input
-                  type="text"
-                  id="username"
-                  value={username}
-                  onChange={(e) => setUsername(e.target.value)}
+                  type="email"
+                  id="email"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
                   className="w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-black"
-                  placeholder="Ingresa tu nombre"
+                  placeholder="tu@email.com"
+                  required
+                />
+              </div>
+              <div className="mb-4">
+                <label htmlFor="password" className="block text-sm font-medium text-gray-700 mb-2">
+                  Contraseña
+                </label>
+                <input
+                  type="password"
+                  id="password"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  className="w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-black"
+                  placeholder="Tu contraseña"
                   required
                 />
               </div>
               <button
                 type="submit"
-                className="w-full bg-black text-white py-3 rounded-md hover:bg-gray-800 transition-colors"
+                disabled={isLoggingIn}
+                className="w-full bg-black text-white py-3 rounded-md hover:bg-gray-800 transition-colors disabled:opacity-50"
               >
-                Entrar
+                {isLoggingIn ? 'Iniciando sesión...' : 'Entrar'}
               </button>
+              
+              {/* Botón de login rápido para testing */}
+              <button
+                type="button"
+                onClick={async () => {
+                  setEmail('josedtm@airis.com');
+                  setPassword('123456hashed');
+                  try {
+                    const result = await login({ 
+                      email: 'josedtm@airis.com', 
+                      password: '123456hashed' 
+                    }).unwrap();
+                    dispatch(setCredentials({ 
+                      user: result.user || { email: 'josedtm@airis.com' }, 
+                      token: result.access_token || result.token 
+                    }));
+                    setShowLoginModal(false);
+                    setEmail('');
+                    setPassword('');
+                  } catch (error) {
+                    console.error('Login failed:', error);
+                    alert('Error al iniciar sesión. Verifica tus credenciales.');
+                  }
+                }}
+                disabled={isLoggingIn}
+                className="w-full mt-2 bg-purple-600 text-white py-2 rounded-md hover:bg-purple-700 transition-colors disabled:opacity-50 text-sm"
+              >
+                🚀 Login rápido (Testing)
+              </button>
+              
               <p className="mt-4 text-sm text-gray-500 text-center">
                 Este es un login simplificado solo para demostración
               </p>

@@ -1,7 +1,8 @@
 import { useState } from 'react';
 import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
-import { UserProvider, useUser } from './context/UserContext';
-import { CartProvider } from './context/CartContext';
+import { Provider, useSelector } from 'react-redux';
+import { store } from './store/store';
+import { selectIsAuthenticated } from './store/slices/authSlice';
 import { AIProvider } from './context/AIContext';
 import Header from './components/Header';
 import Sidebar from './components/Sidebar';
@@ -12,10 +13,11 @@ import ProductDetail from './pages/ProductDetail';
 import Checkout from './pages/Checkout';
 import AIGallery from './pages/AIGallery';
 import ArmarioConIA from './pages/ArmarioConIA';
+import MoodRecommendations from './pages/MoodRecommendations';
 
 const AppContent = () => {
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
-  const { isAuthenticated } = useUser();
+  const isAuthenticated = useSelector(selectIsAuthenticated);
 
   return (
     <div className="min-h-screen bg-white">
@@ -36,6 +38,7 @@ const AppContent = () => {
           <Route path="/checkout" element={<Checkout />} />
           <Route path="/ai-gallery" element={<AIGallery />} />
           <Route path="/armario-con-ia" element={<ArmarioConIA />} />
+          <Route path="/mood-recommendations" element={<MoodRecommendations />} />
         </Routes>
       </main>
 
@@ -50,15 +53,13 @@ const AppContent = () => {
 
 function App() {
   return (
-    <Router basename="/POC">
-      <UserProvider>
-        <CartProvider>
-          <AIProvider>
-            <AppContent />
-          </AIProvider>
-        </CartProvider>
-      </UserProvider>
-    </Router>
+    <Provider store={store}>
+      <Router basename="/POC">
+        <AIProvider>
+          <AppContent />
+        </AIProvider>
+      </Router>
+    </Provider>
   );
 }
 

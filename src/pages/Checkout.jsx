@@ -1,12 +1,15 @@
 import { useState, useEffect } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
-import { useCart } from '../context/CartContext';
-import { useUser } from '../context/UserContext';
+import { useSelector, useDispatch } from 'react-redux';
+import { selectCartItems, selectCartTotal, clearCart } from '../store/slices/cartSlice';
+import { selectIsAuthenticated } from '../store/slices/authSlice';
 
 const Checkout = () => {
   const navigate = useNavigate();
-  const { items, getTotal, clearCart } = useCart();
-  const { isAuthenticated } = useUser();
+  const dispatch = useDispatch();
+  const items = useSelector(selectCartItems);
+  const total = useSelector(selectCartTotal);
+  const isAuthenticated = useSelector(selectIsAuthenticated);
 
   const [formData, setFormData] = useState({
     name: '',
@@ -48,18 +51,15 @@ const Checkout = () => {
 
     // Limpiar carrito después de 3 segundos y redirigir
     setTimeout(() => {
-      clearCart();
+      dispatch(clearCart());
       navigate('/');
     }, 3000);
   };
 
   const getItemPrice = (item) => {
-    return item.discount
-      ? item.price * (1 - item.discount / 100)
-      : item.price;
+    return item.product.product_price;
   };
 
-  const total = getTotal();
   const shipping = total > 50 ? 0 : 4.95;
   const finalTotal = total + shipping;
 
@@ -255,20 +255,20 @@ const Checkout = () => {
               {items.map((item) => {
                 const itemPrice = getItemPrice(item);
                 return (
-                  <div key={`${item.id}-${item.selectedSize}-${item.selectedColor}`} className="flex gap-3">
+                  <div key={`${item.product.product_id}-${item.size}-${item.color}`} className="flex gap-3">
                     <div className="w-16 h-20 flex-shrink-0 bg-gray-100 rounded overflow-hidden">
                       <img
-                        src={item.image}
-                        alt={item.name}
+                        src={item.product.product_images_urls?.[0] || '/placeholder.jpg'}
+                        alt={item.product.product_name}
                         className="w-full h-full object-cover"
                       />
                     </div>
                     <div className="flex-1 min-w-0">
-                      <h3 className="text-sm font-medium line-clamp-2">{item.name}</h3>
+                      <h3 className="text-sm font-medium line-clamp-2">{item.product.product_name}</h3>
                       <p className="text-xs text-gray-500">
-                        {item.selectedSize && `Talla: ${item.selectedSize}`}
-                        {item.selectedSize && item.selectedColor && ' | '}
-                        {item.selectedColor && `Color: ${item.selectedColor}`}
+                        {item.size && `Talla: ${item.size}`}
+                        {item.size && item.color && ' | '}
+                        {item.color && `Color: ${item.color}`}
                       </p>
                       <p className="text-sm">
                         {itemPrice.toFixed(2)} € x {item.quantity}

@@ -1,69 +1,58 @@
-import { useState, useEffect } from 'react';
-import { useParams, useNavigate, Link } from 'react-router-dom';
-import { getProductById } from '../services/api';
-import { useCart } from '../context/CartContext';
-import ProductCard from '../components/ProductCard';
+import { useState } from 'react';
+import { useParams, useNavigate } from 'react-router-dom';
+import { useDispatch, useSelector } from 'react-redux';
+import { useGetCatalogProductsQuery, useCustomizeProductByUserMutation } from '../store/services/airisApi';
+import { addToCart } from '../store/slices/cartSlice';
+import { selectIsAuthenticated } from '../store/slices/authSlice';
 
 const ProductDetail = () => {
   const { id } = useParams();
   const navigate = useNavigate();
-  const { addToCart } = useCart();
-
-  const [product, setProduct] = useState(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
-  const [selectedSize, setSelectedSize] = useState(null);
-  const [selectedColor, setSelectedColor] = useState(null);
+  const dispatch = useDispatch();
+  const isAuthenticated = useSelector(selectIsAuthenticated);
+  
+  const [selectedSize, setSelectedSize] = useState('');
+  const [selectedColor, setSelectedColor] = useState('');
   const [quantity, setQuantity] = useState(1);
-  const [showSuccess, setShowSuccess] = useState(false);
+  const [currentImageIndex, setCurrentImageIndex] = useState(0);
 
-  useEffect(() => {
-    const loadProduct = async () => {
-      try {
-        setLoading(true);
-        setError(null);
+  // Fetch all products and find the one we need
+  const { data: products, isLoading, error } = useGetCatalogProductsQuery();
+  const [customizeProduct, { isLoading: isCustomizing }] = useCustomizeProductByUserMutation();
 
-        const response = await getProductById(id);
-
-        if (response.success) {
-          setProduct(response.data);
-          // Seleccionar primera talla y color por defecto
-          if (response.data.sizes?.length > 0) {
-            setSelectedSize(response.data.sizes[0]);
-          }
-          if (response.data.colors?.length > 0) {
-            setSelectedColor(response.data.colors[0]);
-          }
-        } else {
-          setError(response.error || 'Producto no encontrado');
-        }
-      } catch (err) {
-        console.error('Error al cargar producto:', err);
-        setError('Error al cargar el producto');
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    loadProduct();
-  }, [id]);
+  const product = products?.find(p => p.product_id === parseInt(id));
 
   const handleAddToCart = () => {
-    if (!selectedSize) {
-      alert('Por favor, selecciona una talla');
+    if (!product) return;
+
+    dispatch(addToCart({
+      product,
+      quantity,
+      size: selectedSize,
+      color: selectedColor,
+    }));
+
+    // Show success message or navigate to cart
+    alert('Producto añadido al carrito');
+  };
+
+  const handleCustomize = async () => {
+    if (!isAuthenticated) {
+      alert('Debes iniciar sesión para personalizar productos');
       return;
     }
 
-    addToCart(product, quantity, selectedSize, selectedColor);
-    setShowSuccess(true);
-    setTimeout(() => setShowSuccess(false), 3000);
+    try {
+      const customizedProduct = await customizeProduct(parseInt(id)).unwrap();
+      console.log('Producto personalizado:', customizedProduct);
+      alert('¡Producto personalizado con éxito!');
+    } catch (error) {
+      console.error('Error al personalizar producto:', error);
+      alert('Error al personalizar el producto');
+    }
   };
 
-  const finalPrice = product?.discount
-    ? product.price * (1 - product.discount / 100)
-    : product?.price;
-
-  if (loading) {
+  if (isLoading) {
     return (
       <div className="flex items-center justify-center min-h-screen">
         <div className="text-center">
@@ -78,7 +67,7 @@ const ProductDetail = () => {
     return (
       <div className="flex items-center justify-center min-h-screen">
         <div className="text-center">
-          <p className="text-red-500 mb-4">{error || 'Producto no encontrado'}</p>
+          <p className="text-red-500 mb-4">Producto no encontrado</p>
           <button
             onClick={() => navigate('/')}
             className="px-4 py-2 bg-black text-white rounded-md hover:bg-gray-800"
@@ -90,107 +79,142 @@ const ProductDetail = () => {
     );
   }
 
+  const images = product.product_images_urls || [];
+  const currentImage = images[currentImageIndex] || '/placeholder-image.jpg';
+
+  // Mock sizes and colors (you can enhance this based on product characteristics)
+  const sizes = ['XS', 'S', 'M', 'L', 'XL'];
+  const colors = ['Negro', 'Blanco', 'Gris', 'Azul'];
+
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-      {/* Breadcrumb */}
-      <nav className="mb-8 text-sm">
-        <Link to="/" className="text-gray-500 hover:text-black">Inicio</Link>
-        <span className="mx-2 text-gray-400">/</span>
-        <Link to={`/?category=${product.category}`} className="text-gray-500 hover:text-black">
-          {product.category}
-        </Link>
-        <span className="mx-2 text-gray-400">/</span>
-        <span className="text-black font-medium">{product.name}</span>
-      </nav>
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+        {/* Galería de imágenes */}
+        <div>
+          {/* Imagen principal */}
+          <div className="aspect-[3/4] bg-gray-200 mb-4 overflow-hidden">
+            <img
+              src={currentImage}
+              alt={product.product_name}
+              className="w-full h-full object-cover"
+            />
+          </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 lg:gap-12">
-        {/* Imagen */}
-        <div className="aspect-[3/4] bg-gray-100 rounded-lg overflow-hidden">
-          <img
-            src={product.image}
-            alt={product.name}
-            className="w-full h-full object-cover"
-          />
+          {/* Miniaturas */}
+          {images.length > 1 && (
+            <div className="grid grid-cols-4 gap-2">
+              {images.map((img, index) => (
+                <button
+                  key={index}
+                  onClick={() => setCurrentImageIndex(index)}
+                  className={`aspect-square bg-gray-200 overflow-hidden border-2 ${
+                    currentImageIndex === index ? 'border-black' : 'border-transparent'
+                  }`}
+                >
+                  <img
+                    src={img}
+                    alt={`${product.product_name} ${index + 1}`}
+                    className="w-full h-full object-cover"
+                  />
+                </button>
+              ))}
+            </div>
+          )}
         </div>
 
         {/* Información del producto */}
-        <div className="flex flex-col">
-          {/* Título y precio */}
+        <div>
+          <h1 className="text-3xl font-bold mb-4">{product.product_name}</h1>
+
+          {/* Precio */}
           <div className="mb-6">
-            <h1 className="text-3xl font-bold mb-2">{product.name}</h1>
-            <div className="flex items-center gap-3">
-              {product.discount > 0 ? (
-                <>
-                  <span className="text-2xl font-bold">{finalPrice.toFixed(2)} €</span>
-                  <span className="text-xl text-gray-500 line-through">{product.price.toFixed(2)} €</span>
-                  <span className="bg-red-500 text-white text-sm font-bold px-2 py-1 rounded">
-                    -{product.discount}%
-                  </span>
-                </>
-              ) : (
-                <span className="text-2xl font-bold">{product.price.toFixed(2)} €</span>
-              )}
-            </div>
+            <span className="text-2xl font-bold">{product.product_price.toFixed(2)} €</span>
           </div>
 
           {/* Descripción */}
-          <p className="text-gray-700 mb-6">{product.description}</p>
-
-          {/* Selector de color */}
-          {product.colors && product.colors.length > 0 && (
+          {product.product_description && (
             <div className="mb-6">
-              <label className="block text-sm font-medium mb-3">
-                Color: <span className="font-bold">{selectedColor}</span>
-              </label>
-              <div className="flex gap-2">
-                {product.colors.map((color, index) => (
-                  <button
-                    key={color}
-                    onClick={() => setSelectedColor(color)}
-                    className={`w-10 h-10 rounded-full border-2 ${
-                      selectedColor === color ? 'border-black' : 'border-gray-300'
-                    }`}
-                    style={{ backgroundColor: product.colorCodes[index] }}
-                    title={color}
-                  />
+              <p className="text-gray-700">{product.product_description}</p>
+            </div>
+          )}
+
+          {/* Características */}
+          {product.product_characteristics && product.product_characteristics.length > 0 && (
+            <div className="mb-6">
+              <h3 className="font-semibold mb-2">Características:</h3>
+              <div className="flex flex-wrap gap-2">
+                {product.product_characteristics.map((char, index) => (
+                  <span
+                    key={index}
+                    className="bg-gray-100 text-gray-700 px-3 py-1 rounded-full text-sm"
+                  >
+                    {char}
+                  </span>
                 ))}
               </div>
+            </div>
+          )}
+
+          {/* Género */}
+          {product.product_gender && (
+            <div className="mb-6">
+              <span className="text-sm text-gray-600">
+                Género: <span className="font-semibold">{product.product_gender}</span>
+              </span>
             </div>
           )}
 
           {/* Selector de talla */}
-          {product.sizes && product.sizes.length > 0 && (
-            <div className="mb-6">
-              <label className="block text-sm font-medium mb-3">Talla</label>
-              <div className="grid grid-cols-5 gap-2">
-                {product.sizes.map((size) => (
-                  <button
-                    key={size}
-                    onClick={() => setSelectedSize(size)}
-                    className={`py-2 border rounded-md text-center font-medium transition-colors ${
-                      selectedSize === size
-                        ? 'border-black bg-black text-white'
-                        : 'border-gray-300 hover:border-black'
-                    }`}
-                  >
-                    {size}
-                  </button>
-                ))}
-              </div>
+          <div className="mb-6">
+            <label className="block text-sm font-semibold mb-2">Talla</label>
+            <div className="flex gap-2">
+              {sizes.map((size) => (
+                <button
+                  key={size}
+                  onClick={() => setSelectedSize(size)}
+                  className={`px-4 py-2 border ${
+                    selectedSize === size
+                      ? 'border-black bg-black text-white'
+                      : 'border-gray-300 hover:border-black'
+                  }`}
+                >
+                  {size}
+                </button>
+              ))}
             </div>
-          )}
+          </div>
+
+          {/* Selector de color */}
+          <div className="mb-6">
+            <label className="block text-sm font-semibold mb-2">Color</label>
+            <div className="flex gap-2">
+              {colors.map((color) => (
+                <button
+                  key={color}
+                  onClick={() => setSelectedColor(color)}
+                  className={`px-4 py-2 border ${
+                    selectedColor === color
+                      ? 'border-black bg-black text-white'
+                      : 'border-gray-300 hover:border-black'
+                  }`}
+                >
+                  {color}
+                </button>
+              ))}
+            </div>
+          </div>
 
           {/* Selector de cantidad */}
           <div className="mb-6">
-            <label className="block text-sm font-medium mb-3">Cantidad</label>
-            <div className="flex items-center border border-gray-300 rounded-md w-32">
+            <label className="block text-sm font-semibold mb-2">Cantidad</label>
+            <div className="flex items-center border border-gray-300 w-32">
               <button
                 onClick={() => setQuantity(Math.max(1, quantity - 1))}
                 className="px-4 py-2 hover:bg-gray-100"
               >
                 -
               </button>
-              <span className="flex-1 text-center font-medium">{quantity}</span>
+              <span className="flex-1 text-center font-semibold">{quantity}</span>
               <button
                 onClick={() => setQuantity(quantity + 1)}
                 className="px-4 py-2 hover:bg-gray-100"
@@ -201,78 +225,33 @@ const ProductDetail = () => {
           </div>
 
           {/* Botones de acción */}
-          <div className="space-y-3 mb-6">
+          <div className="space-y-3">
             <button
               onClick={handleAddToCart}
-              className="w-full bg-black text-white py-4 rounded-md font-medium hover:bg-gray-800 transition-colors"
+              disabled={!selectedSize || !selectedColor}
+              className="w-full bg-black text-white py-3 rounded-md font-semibold hover:bg-gray-800 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
             >
               Añadir al carrito
             </button>
 
-            {showSuccess && (
-              <div className="bg-green-100 border border-green-400 text-green-700 px-4 py-3 rounded">
-                Producto añadido al carrito
-              </div>
+            {isAuthenticated && (
+              <button
+                onClick={handleCustomize}
+                disabled={isCustomizing}
+                className="w-full border-2 border-black text-black py-3 rounded-md font-semibold hover:bg-gray-100 transition-colors disabled:opacity-50"
+              >
+                {isCustomizing ? 'Personalizando...' : '✨ Personalizar con IA'}
+              </button>
             )}
           </div>
 
-          {/* Información adicional */}
-          <div className="space-y-4 text-sm border-t border-gray-200 pt-6">
-            {product.material && (
-              <div>
-                <span className="font-medium">Composición: </span>
-                <span className="text-gray-700">{product.material}</span>
-              </div>
-            )}
-
-            {product.care && (
-              <div>
-                <span className="font-medium">Cuidados: </span>
-                <ul className="text-gray-700 mt-2 space-y-1">
-                  {product.care.map((instruction, index) => (
-                    <li key={index}>• {instruction}</li>
-                  ))}
-                </ul>
-              </div>
-            )}
-
-            {product.features && (
-              <div>
-                <span className="font-medium">Características: </span>
-                <ul className="text-gray-700 mt-2 space-y-1">
-                  {product.features.map((feature, index) => (
-                    <li key={index}>• {feature}</li>
-                  ))}
-                </ul>
-              </div>
-            )}
-          </div>
+          {!selectedSize || !selectedColor ? (
+            <p className="text-sm text-red-500 mt-2">
+              Por favor, selecciona talla y color
+            </p>
+          ) : null}
         </div>
       </div>
-
-      {/* Productos relacionados */}
-      {product.relatedProducts && product.relatedProducts.length > 0 && (
-        <div className="mt-16">
-          <h2 className="text-2xl font-bold mb-6">También te puede gustar</h2>
-          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 md:gap-6">
-            {product.relatedProducts.map((relatedProduct) => (
-              <div key={relatedProduct.id}>
-                <Link to={`/product/${relatedProduct.id}`}>
-                  <div className="aspect-[3/4] bg-gray-100 rounded-lg overflow-hidden mb-3">
-                    <img
-                      src={relatedProduct.image}
-                      alt={relatedProduct.name}
-                      className="w-full h-full object-cover hover:scale-105 transition-transform duration-300"
-                    />
-                  </div>
-                  <h3 className="font-medium text-sm mb-1 line-clamp-2">{relatedProduct.name}</h3>
-                  <p className="font-bold">{relatedProduct.price.toFixed(2)} €</p>
-                </Link>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
     </div>
   );
 };

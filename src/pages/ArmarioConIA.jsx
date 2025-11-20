@@ -1,23 +1,60 @@
 import { useState, useEffect } from 'react';
 import { Navigate, Link } from 'react-router-dom';
+import { useSelector } from 'react-redux';
+import { selectIsAuthenticated, selectCurrentUser } from '../store/slices/authSlice';
 import { useAI } from '../hooks/useAI';
-import { useUser } from '../context/UserContext';
 import { getAIImages } from '../services/api';
 
 const ArmarioConIA = () => {
-  const { isAuthenticated, user } = useUser();
+  const isAuthenticated = useSelector(selectIsAuthenticated);
+  const user = useSelector(selectCurrentUser);
   const { isAICompleted } = useAI();
   const [images, setImages] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
   useEffect(() => {
-    const loadAIImages = async () => {
+    const loadImages = async () => {
       try {
         setLoading(true);
-        const response = await getAIImages(user?.username || 'user1');
-        if (response.success) {
-          setImages(response.data);
+        
+        // Primero, verificar si hay imágenes generadas en sessionStorage
+        const generatedImagesStr = sessionStorage.getItem('aiGeneratedImages');
+        
+        if (generatedImagesStr) {
+          const generatedImages = JSON.parse(generatedImagesStr);
+          
+          // Formatear las imágenes generadas para que coincidan con el formato esperado
+          const formattedImages = generatedImages.map((img, index) => {
+            const isAbsoluteUrl = img.image.startsWith('http');
+            const imageUrl = isAbsoluteUrl 
+              ? img.image 
+              : `https://airis-api-711296505139.europe-southwest1.run.app/image/${img.image}`;
+              
+            return {
+              id: `generated-${img.productId}-${index}`,
+              imageUrl: imageUrl,
+              description: `${img.productName} - Personalizado con IA`,
+              product: {
+                id: img.productId,
+                name: img.originalProduct.product_name,
+                price: img.originalProduct.product_price,
+                discount: 0
+              },
+              generated: new Date().toISOString()
+            };
+          });
+          
+          setImages(formattedImages);
+          
+          // No limpiar el sessionStorage inmediatamente para evitar problemas con Strict Mode (doble ejecución)
+          // sessionStorage.removeItem('aiGeneratedImages');
+        } else {
+          // Si no hay imágenes generadas, cargar las imágenes del usuario
+          const response = await getAIImages(user?.username || 'user1');
+          if (response.success) {
+            setImages(response.data);
+          }
         }
       } catch (err) {
         setError('Error al cargar tus imágenes personalizadas');
@@ -27,14 +64,14 @@ const ArmarioConIA = () => {
       }
     };
 
-    if (isAuthenticated && isAICompleted) {
-      loadAIImages();
+    if (isAuthenticated) {
+      loadImages();
     }
-  }, [isAuthenticated, isAICompleted, user]);
+  }, [isAuthenticated, user]);
 
-  // Redirigir si no está autenticado o no ha completado el proceso
-  if (!isAuthenticated || !isAICompleted) {
-    return <Navigate to="/POC" replace />;
+  // Redirigir si no está autenticado
+  if (!isAuthenticated) {
+    return <Navigate to="/" replace />;
   }
 
   return (
@@ -79,7 +116,7 @@ const ArmarioConIA = () => {
               Aún no hemos generado imágenes personalizadas para ti
             </p>
             <Link
-              to="/POC"
+              to="/"
               className="inline-block bg-black text-white px-6 py-3 rounded-md hover:bg-gray-800 transition-colors"
             >
               Explorar productos
@@ -119,18 +156,18 @@ const ArmarioConIA = () => {
                           {image.product.discount > 0 ? (
                             <>
                               <span className="text-red-600">
-                                ${(image.product.price * (1 - image.product.discount / 100)).toFixed(2)}
+                                {(image.product.price * (1 - image.product.discount / 100)).toFixed(2)} €
                               </span>
                               <span className="text-gray-400 line-through ml-2 text-sm">
-                                ${image.product.price.toFixed(2)}
+                                {image.product.price.toFixed(2)} €
                               </span>
                             </>
                           ) : (
-                            <span>${image.product.price.toFixed(2)}</span>
+                            <span>{image.product.price.toFixed(2)} €</span>
                           )}
                         </p>
                         <Link
-                          to={`/POC/product/${image.product.id}`}
+                          to={`/product/${image.product.id}`}
                           className="block w-full bg-black text-white text-center py-2 rounded-md hover:bg-gray-800 transition-colors text-sm"
                         >
                           Ver producto
