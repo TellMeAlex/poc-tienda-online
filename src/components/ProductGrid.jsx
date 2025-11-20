@@ -1,7 +1,21 @@
 import ProductCard from './ProductCard';
 
-const ProductGrid = ({ products, title }) => {
-  if (!products || products.length === 0) {
+const ProductSkeleton = () => (
+  <div className="bg-white border border-gray-200 rounded-lg overflow-hidden animate-pulse">
+    <div className="aspect-[3/4] bg-gray-200"></div>
+    <div className="p-4 space-y-3">
+      <div className="h-4 bg-gray-200 rounded w-3/4"></div>
+      <div className="h-4 bg-gray-200 rounded w-1/4"></div>
+      <div className="h-10 bg-gray-200 rounded w-full mt-4"></div>
+    </div>
+  </div>
+);
+
+const ProductGrid = ({ products, title, loading = false, skeletonCount = 8 }) => {
+  const showSkeletons = loading;
+  const hasProducts = products && products.length > 0;
+
+  if (!hasProducts && !showSkeletons) {
     return (
       <div className="text-center py-12">
         <p className="text-gray-500 text-lg">No se encontraron productos</p>
@@ -24,8 +38,12 @@ const ProductGrid = ({ products, title }) => {
 
       {/* Grid de productos */}
       <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-x-3 gap-y-8">
-        {products.map((product) => (
-          <ProductCard key={product.id} product={product} />
+        {hasProducts && products.map((product) => (
+          <ProductCard key={product.id || product.product_id} product={product} />
+        ))}
+        
+        {showSkeletons && Array.from({ length: skeletonCount }).map((_, index) => (
+          <ProductSkeleton key={`skeleton-${index}`} />
         ))}
       </div>
     </div>

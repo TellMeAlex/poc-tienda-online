@@ -5,6 +5,8 @@ import { selectCartItemsCount } from '../store/slices/cartSlice';
 import { selectIsAuthenticated, selectCurrentUser, setCredentials, logout as logoutAction } from '../store/slices/authSlice';
 import { useLoginMutation } from '../store/services/airisApi';
 
+import { useAI } from '../hooks/useAI';
+
 const Header = ({ onMenuClick }) => {
   const [searchQuery, setSearchQuery] = useState('');
   const [showLoginModal, setShowLoginModal] = useState(false);
@@ -17,6 +19,7 @@ const Header = ({ onMenuClick }) => {
   const isAuthenticated = useSelector(selectIsAuthenticated);
   const user = useSelector(selectCurrentUser);
   const navigate = useNavigate();
+  const { resetAIState } = useAI();
   
   const [login, { isLoading: isLoggingIn }] = useLoginMutation();
 
@@ -47,6 +50,7 @@ const Header = ({ onMenuClick }) => {
   };
 
   const handleLogout = () => {
+    resetAIState();
     dispatch(logoutAction());
   };
 

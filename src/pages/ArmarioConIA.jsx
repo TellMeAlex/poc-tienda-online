@@ -221,5 +221,4 @@ const ArmarioConIA = () => {
     </div>
   );
 };
-
 export default ArmarioConIA;
