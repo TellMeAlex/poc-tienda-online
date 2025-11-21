@@ -1,6 +1,7 @@
+import { useEffect } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
 import { useSelector } from 'react-redux';
-import { selectIsAuthenticated } from '../store/slices/authSlice';
+import { selectIsAuthenticated, selectCurrentToken } from '../store/slices/authSlice';
 import ProductGrid from '../components/ProductGrid';
 import { 
   useGetCatalogProductsQuery, 
@@ -15,11 +16,12 @@ const Home = () => {
   const isAuthenticated = useSelector(selectIsAuthenticated);
   
   // Get user mood (only if authenticated and no search)
-  const { 
-    data: userMood, 
-    isLoading: isMoodLoading 
+  const {
+    data: userMood,
+    isLoading: isMoodLoading
   } = useGetLatestUserMoodQuery(undefined, {
     skip: !isAuthenticated || !!search,
+    refetchOnMountOrArgChange: true,
   });
 
   // Get suggested products based on mood (only if we have mood data)
@@ -67,11 +69,21 @@ const Home = () => {
     const category = searchParams.get('category');
     const filter = searchParams.get('filter');
 
-    if (search) return `Resultados para "${search}"`;
-    if (isAuthenticated && userMood?.related_products_query && moodBasedProducts) return `Recomendaciones para ti: ${userMood.mood_phrase}`;
-    if (category) return category;
-    if (filter === 'new') return 'Novedades';
-    if (filter === 'bestsellers') return 'Bestsellers';
+    if (search) {
+      return 'Resultados para "' + search + '"';
+    }
+    if (isAuthenticated && userMood?.related_products_query && moodBasedProducts) {
+      return 'Recomendaciones para ti: ' + userMood.mood_phrase;
+    }
+    if (category) {
+      return category;
+    }
+    if (filter === 'new') {
+      return 'Novedades';
+    }
+    if (filter === 'bestsellers') {
+      return 'Bestsellers';
+    }
     return 'Todos los productos';
   };
 

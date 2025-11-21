@@ -149,13 +149,15 @@ export const AIProvider = ({ children }) => {
 
       const results = await Promise.all(promises);
       const validImages = results.filter(r => r !== null);
-      
+
+      console.log('✅ Generation completed. Valid images:', validImages.length);
       setGeneratedImages(validImages);
-      
+
       // Guardar las imágenes en localStorage para que persistan entre recargas
       if (validImages.length > 0) {
         localStorage.setItem('aiGeneratedImages', JSON.stringify(validImages));
-        completeProcessing();
+        console.log('📝 localStorage updated with', validImages.length, 'images');
+        completeProcessing(validImages);
       } else {
         throw new Error('No se pudieron generar recomendaciones personalizadas');
       }
@@ -167,15 +169,17 @@ export const AIProvider = ({ children }) => {
   }, [catalogProducts, customizeProduct]);
 
   const completeProcessing = (images) => {
+    console.log('🎉 completeProcessing called with', images?.length, 'images');
     setAiStatus('completed');
     setGeneratedImages(images);
-    
+
     // Guardar en sessionStorage para la página de resultados
     sessionStorage.setItem('ai_generated_images', JSON.stringify(images));
-    
+
     // Persistir estado completado
     localStorage.setItem(AI_STORAGE_KEYS.STATUS, 'completed');
     localStorage.setItem(AI_STORAGE_KEYS.COMPLETED, 'true');
+    console.log('✅ localStorage ai_status set to: completed');
   };
 
   const dismissNotification = useCallback(() => {

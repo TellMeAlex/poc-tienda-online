@@ -1,4 +1,5 @@
 import { createSlice } from '@reduxjs/toolkit';
+import { airisApi } from '../services/airisApi';
 
 const initialState = {
   user: null,
@@ -36,10 +37,16 @@ const authSlice = createSlice({
       state.user = null;
       state.token = null;
       state.isAuthenticated = false;
-      
+
       // Clear sessionStorage
       sessionStorage.removeItem('auth');
     },
+  },
+  extraReducers: (builder) => {
+    // Reset API cache on logout
+    builder.addCase('auth/logout', (state) => {
+      airisApi.util.resetApiState();
+    });
   },
 });
 

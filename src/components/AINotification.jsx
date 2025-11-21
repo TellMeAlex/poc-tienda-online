@@ -19,6 +19,18 @@ const AINotification = () => {
   const [showUploadModal, setShowUploadModal] = useState(false);
   const [currentMessageIndex, setCurrentMessageIndex] = useState(0);
 
+  // Log aiStatus changes for debugging
+  useEffect(() => {
+    console.log('🔔 AINotification - aiStatus changed to:', aiStatus);
+  }, [aiStatus]);
+
+  // Abrir modal automáticamente si hay foto subida
+  useEffect(() => {
+    if (aiStatus === 'uploaded') {
+      setShowUploadModal(true);
+    }
+  }, [aiStatus]);
+
   // Rotar mensajes durante la generación
   useEffect(() => {
     if (aiStatus === 'generating') {
@@ -64,39 +76,27 @@ const AINotification = () => {
     return null;
   }
 
-  // Estado: idle - Botón inicial para subir foto
-  if (aiStatus === 'idle') {
+  // Estados: idle, uploading, uploaded - Mostrar botón/indicador y mantener modal montado
+  if (aiStatus === 'idle' || aiStatus === 'uploading' || aiStatus === 'uploaded') {
     return (
       <>
-        <button
-          onClick={handleOpenModal}
-          className="fixed bottom-4 right-4 z-50 bg-black text-white px-6 py-3 rounded-lg shadow-lg hover:bg-gray-800 transition-all hover:scale-105 flex items-center gap-2"
-        >
-          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 3v4M3 5h4M6 17v4m-2-2h4m5-16l2.286 6.857L21 12l-5.714 2.143L13 21l-2.286-6.857L5 12l5.714-2.143L13 3z" />
-          </svg>
-          Personaliza tu experiencia
-        </button>
+        {/* Botón flotante solo en estado idle */}
+        {aiStatus === 'idle' && (
+          <button
+            onClick={handleOpenModal}
+            className="fixed bottom-4 right-4 z-50 bg-black text-white px-6 py-3 rounded-lg shadow-lg hover:bg-gray-800 transition-all hover:scale-105 flex items-center gap-2"
+          >
+            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 3v4M3 5h4M6 17v4m-2-2h4m5-16l2.286 6.857L21 12l-5.714 2.143L13 21l-2.286-6.857L5 12l5.714-2.143L13 3z" />
+            </svg>
+            Personaliza tu experiencia
+          </button>
+        )}
+
+        {/* Mantener modal montado durante todo el flujo de upload */}
         <AIUploadModal isOpen={showUploadModal} onClose={handleCloseModal} />
       </>
     );
-  }
-
-  // Estado: uploading - Subiendo foto
-  if (aiStatus === 'uploading') {
-    return (
-      <div className="fixed bottom-4 right-4 z-50 bg-white rounded-lg shadow-xl p-4 w-80 border border-gray-200">
-        <div className="mb-3 text-sm font-medium text-gray-700 text-center flex items-center justify-center gap-2">
-          <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-black"></div>
-          Subiendo tu foto...
-        </div>
-      </div>
-    );
-  }
-
-  // Estado: uploaded - No mostrar nada, el modal maneja este estado
-  if (aiStatus === 'uploaded') {
-    return null;
   }
 
   // Estado: generating - Generando productos

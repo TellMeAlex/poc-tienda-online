@@ -26,7 +26,7 @@ export const airisApi = createApi({
           user_password: password,
         },
       }),
-      invalidatesTags: ['Auth'],
+      invalidatesTags: ['Auth', 'UserMood'],
     }),
 
     // Get suggested products based on search query (vector embeddings)
