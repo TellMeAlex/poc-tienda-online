@@ -1,17 +1,20 @@
-import { useState, useEffect } from 'react';
+import { useMemo } from 'react';
 import { Navigate, Link } from 'react-router-dom';
 import { useSelector } from 'react-redux';
 import { selectIsAuthenticated, selectCurrentUser } from '../store/slices/authSlice';
 import { useAI } from '../hooks/useAI';
-import { getAIImages } from '../services/api';
+import { useGetAllUserGenerationsQuery } from '../store/services/airisApi';
 
 const ArmarioConIA = () => {
   const isAuthenticated = useSelector(selectIsAuthenticated);
   const user = useSelector(selectCurrentUser);
   const { isAICompleted } = useAI();
-  const [images, setImages] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
+
+  // Fetch all user generations from API
+  const { data: generationsData, isLoading, isFetching, error } = useGetAllUserGenerationsQuery(
+    undefined,
+    { skip: !isAuthenticated } // Only fetch if authenticated
+  );
 
   // Helper function to determine height based on index pattern for masonry effect
   const getHeightClass = (index) => {
@@ -30,62 +33,32 @@ const ArmarioConIA = () => {
     return patterns[index % patterns.length];
   };
 
-  useEffect(() => {
-    const loadImages = async () => {
-      try {
-        setLoading(true);
-        
-        // Primero, verificar si hay imágenes generadas en localStorage
-        const generatedImagesStr = localStorage.getItem('aiGeneratedImages');
-        
-        if (generatedImagesStr) {
-          const generatedImages = JSON.parse(generatedImagesStr);
-          
-          // Formatear las imágenes generadas para que coincidan con el formato esperado
-          const formattedImages = generatedImages.map((img, index) => {
-            const isAbsoluteUrl = img.image.startsWith('http');
-            const imageUrl = isAbsoluteUrl 
-              ? img.image 
-              : `https://airis-api-711296505139.europe-southwest1.run.app/image/${img.image}`;
-              
-            return {
-              id: `generated-${img.productId}-${index}`,
-              imageUrl: imageUrl,
-              description: `${img.productName} - Personalizado con IA`,
-              product: {
-                id: img.productId,
-                name: img.originalProduct.product_name,
-                price: img.originalProduct.product_price,
-                discount: 0
-              },
-              generated: new Date().toISOString()
-            };
-          });
-          
-          setImages(formattedImages);
-          
-          // Las imágenes ahora persisten en localStorage para sobrevivir recargas de página
-          // Si quieres limpiarlas después de cargar, descomenta la siguiente línea:
-          // localStorage.removeItem('aiGeneratedImages');
-        } else {
-          // Si no hay imágenes generadas, cargar las imágenes del usuario
-          const response = await getAIImages(user?.username || 'user1');
-          if (response.success) {
-            setImages(response.data);
-          }
-        }
-      } catch (err) {
-        setError('Error al cargar tus imágenes personalizadas');
-        console.error(err);
-      } finally {
-        setLoading(false);
-      }
-    };
+  // Transform API response to component format
+  const images = useMemo(() => {
+    if (!generationsData || !Array.isArray(generationsData)) return [];
 
-    if (isAuthenticated) {
-      loadImages();
-    }
-  }, [isAuthenticated, user]);
+    return generationsData.map((generation, index) => {
+      // Get the generated image URL (usually the second image in the array)
+      // or fallback to the first image in the product_images_urls array
+      const imageUrls = generation.product_images_urls || [];
+      const generatedImageUrl = imageUrls.length > 1
+        ? imageUrls[1]  // User-generated image
+        : imageUrls[0];  // Fallback to product image
+
+      return {
+        id: `generation-${generation.product_id}-${index}`,
+        imageUrl: generatedImageUrl || `https://airis-api-711296505139.europe-southwest1.run.app/image/placeholder.jpg`,
+        description: `${generation.product_name || 'Producto'} - Personalizado con IA`,
+        product: {
+          id: generation.product_id,
+          name: generation.product_name,
+          price: generation.product_price || 0,
+          discount: 0
+        },
+        generated: generation.created_at || new Date().toISOString()
+      };
+    });
+  }, [generationsData]);
 
   // Redirigir si no está autenticado
   if (!isAuthenticated) {
@@ -101,7 +74,7 @@ const ArmarioConIA = () => {
             <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 3v4M3 5h4M6 17v4m-2-2h4m5-16l2.286 6.857L21 12l-5.714 2.143L13 21l-2.286-6.857L5 12l5.714-2.143L13 3z" />
             </svg>
-            <h1 className="text-4xl font-bold">Tu Armario con IA</h1>
+            <h1 className="text-4xl font-bold">Tu AIrmario</h1>
           </div>
           <p className="text-gray-300 text-lg">
             Descubre cómo luces con nuestros productos personalizados especialmente para ti
@@ -111,7 +84,7 @@ const ArmarioConIA = () => {
 
       {/* Content */}
       <div className="max-w-[1600px] mx-auto px-4 py-8">
-        {loading && (
+        {isLoading && (
           <div className="flex flex-col items-center justify-center py-20">
             <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-black mb-4"></div>
             <p className="text-gray-600">Cargando tu armario personalizado...</p>
@@ -120,11 +93,11 @@ const ArmarioConIA = () => {
 
         {error && (
           <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded mb-4">
-            {error}
+            Error al cargar tus imágenes personalizadas
           </div>
         )}
 
-        {!loading && !error && images.length === 0 && (
+        {!isLoading && !error && images.length === 0 && (
           <div className="text-center py-20">
             <svg className="w-16 h-16 text-gray-400 mx-auto mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
@@ -142,7 +115,7 @@ const ArmarioConIA = () => {
           </div>
         )}
 
-        {!loading && !error && images.length > 0 && (
+        {!isLoading && !error && images.length > 0 && (
           <>
             <div className="mb-6">
               <h2 className="text-2xl font-bold mb-2">Tus Looks Personalizados</h2>
@@ -197,6 +170,7 @@ const ArmarioConIA = () => {
                           </p>
                           <Link
                             to={`/product/${image.product.id}`}
+                            state={{ generatedImageUrl: image.imageUrl }}
                             className="block w-full bg-white text-black text-center py-2 rounded-md hover:bg-gray-100 transition-colors text-sm font-semibold transform translate-y-2 group-hover:translate-y-0 transition-transform duration-500"
                             style={{ animationDelay: '400ms' }}
                           >
