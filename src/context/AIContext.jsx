@@ -35,13 +35,11 @@ export const AIProvider = ({ children }) => {
   const [customizeProduct] = useCustomizeProductByUserMutation();
   
   // Get user mood after upload
-  const { 
-    data: userMood, 
-    isLoading: isMoodLoading,
-    refetch: refetchMood 
+  const {
+    data: userMood,
+    isLoading: isMoodLoading
   } = useGetLatestUserMoodQuery(undefined, {
     skip: !shouldFetchMood || !isAuthenticated,
-    refetchOnMountOrArgChange: true,
   });
 
   // Get suggested products based on mood
@@ -112,21 +110,18 @@ export const AIProvider = ({ children }) => {
       }).unwrap();
 
       console.log('✅ Image uploaded successfully, fetching mood...');
-      
+
       // Trigger mood fetch after successful upload
       setShouldFetchMood(true);
       setAiStatus('fetching_mood');
       localStorage.setItem(AI_STORAGE_KEYS.STATUS, 'fetching_mood');
       localStorage.setItem(AI_STORAGE_KEYS.PHOTO_UPLOADED, 'true');
-      
-      // Refetch mood data
-      await refetchMood();
     } catch (error) {
       console.error('Error uploading photo:', error);
       setAiStatus('idle');
       throw error;
     }
-  }, [uploadUserImages, getUserIdFromToken, refetchMood]);
+  }, [uploadUserImages, getUserIdFromToken]);
 
   const generateRecommendations = useCallback(async (productsToCustomize) => {
     if (!productsToCustomize || productsToCustomize.length === 0) {
