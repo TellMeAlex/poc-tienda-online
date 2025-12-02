@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { useEffect, useMemo } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
 import { useSelector } from 'react-redux';
 import { selectIsAuthenticated, selectCurrentToken } from '../store/slices/authSlice';
@@ -8,21 +8,29 @@ import {
   useGetSuggestedProductsQuery,
   useGetLatestUserMoodQuery
 } from '../store/services/airisApi';
+import useTypewriter from '../hooks/useTypewriter';
+import { useAI } from '../hooks/useAI';
 
 const Home = () => {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const search = searchParams.get('search');
   const isAuthenticated = useSelector(selectIsAuthenticated);
+  const { customizedImagesMap, hasRecommendations } = useAI();
+
+  // Show mood-based products if user has active recommendations
+  const shouldShowMoodProducts = isAuthenticated && hasRecommendations;
   
-  // Get user mood (only if authenticated and no search)
+  // Get user mood (uses persistent hasRecommendations flag)
   const {
     data: userMood,
     isLoading: isMoodLoading
   } = useGetLatestUserMoodQuery(undefined, {
-    skip: !isAuthenticated || !!search,
-    refetchOnMountOrArgChange: true,
+    skip: !shouldShowMoodProducts || !!search,
   });
+
+  // Typewriter effect for mood phrase (0.5s delay between characters)
+  const typedMoodPhrase = useTypewriter(userMood?.mood_phrase || '', 50);
 
   // Get suggested products based on mood (only if we have mood data)
   const { 
@@ -50,12 +58,36 @@ const Home = () => {
     skip: !search,
   });
 
-  // Determine which data to use
-  const products = search 
+  // Determine which base data to use
+  // Only show mood-based products after user clicks CTA (not during products_ready state)
+  const baseProducts = search 
     ? searchProducts 
-    : (isAuthenticated && moodBasedProducts) 
+    : (shouldShowMoodProducts && moodBasedProducts) 
       ? moodBasedProducts 
       : catalogProducts;
+
+  // Merge customized images into products in real-time
+  const products = useMemo(() => {
+    if (!baseProducts || Object.keys(customizedImagesMap).length === 0) {
+      return baseProducts;
+    }
+
+    // Replace product images with customized ones if available
+    return baseProducts.map(product => {
+      const customizedImage = customizedImagesMap[product.product_id];
+      
+      if (customizedImage) {
+        // Create a new product object with the customized image
+        return {
+          ...product,
+          product_images_urls: [customizedImage, ...(product.product_images_urls || [])],
+          isCustomized: true
+        };
+      }
+      
+      return product;
+    });
+  }, [baseProducts, customizedImagesMap]);
   
   const loading = search 
     ? isSearchLoading 
@@ -72,8 +104,8 @@ const Home = () => {
     if (search) {
       return 'Resultados para "' + search + '"';
     }
-    if (isAuthenticated && userMood?.related_products_query && moodBasedProducts) {
-      return 'Recomendaciones para ti: ' + userMood.mood_phrase;
+    if (shouldShowMoodProducts && userMood?.related_products_query && moodBasedProducts) {
+      return typedMoodPhrase;
     }
     if (category) {
       return category;
@@ -84,7 +116,8 @@ const Home = () => {
     if (filter === 'bestsellers') {
       return 'Bestsellers';
     }
-    return 'Todos los productos';
+    // Default to "Novedades" when entering the shop
+    return 'Novedades';
   };
 
   return (
