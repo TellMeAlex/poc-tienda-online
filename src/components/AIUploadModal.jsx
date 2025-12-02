@@ -1,24 +1,28 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useAI } from '../hooks/useAI';
 
 const AIUploadModal = ({ isOpen, onClose }) => {
   const { uploadPhoto, generateRecommendations, aiStatus } = useAI();
+  const fileInputRef = useRef(null);
   const [selectedFile, setSelectedFile] = useState(null);
   const [previewUrl, setPreviewUrl] = useState(null);
   const [isUploading, setIsUploading] = useState(false);
   const [uploadSuccess, setUploadSuccess] = useState(false);
   const [error, setError] = useState(null);
 
-  // Reset state when modal closes
+  // Reset state when modal closes (but not while uploading)
   useEffect(() => {
-    if (!isOpen) {
+    if (!isOpen && !isUploading) {
       setSelectedFile(null);
       setPreviewUrl(null);
-      setIsUploading(false);
       setUploadSuccess(false);
       setError(null);
+      // Reset the file input DOM element
+      if (fileInputRef.current) {
+        fileInputRef.current.value = '';
+      }
     }
-  }, [isOpen]);
+  }, [isOpen, isUploading]);
 
   // Check if photo was already uploaded
   useEffect(() => {
@@ -44,32 +48,34 @@ const AIUploadModal = ({ isOpen, onClose }) => {
     
     try {
       await uploadPhoto(selectedFile);
-      setUploadSuccess(true);
+      // Close modal immediately after successful upload
+      // The flow will continue automatically (mood fetch + product customization)
+      console.log('✅ Upload successful, closing modal and starting automatic flow');
+      
+      // Let useEffect handle state cleanup when modal closes
+      setIsUploading(false);
+      onClose();
     } catch (error) {
       console.error('Error uploading photo:', error);
       setError('Error al subir la foto. Por favor, inténtalo de nuevo.');
-    } finally {
       setIsUploading(false);
     }
   };
 
-  const handleGenerateRecommendations = async () => {
-    try {
-      await generateRecommendations();
-      // Cerrar modal tras iniciar generación
-      handleClose();
-    } catch (error) {
-      console.error('Error generating recommendations:', error);
-      setError('Error al generar recomendaciones. Por favor, inténtalo de nuevo.');
-    }
-  };
-
   const handleClose = () => {
+    // Only allow closing if not currently uploading
+    if (isUploading) {
+      return;
+    }
+    
     setSelectedFile(null);
     setPreviewUrl(null);
-    setIsUploading(false);
     setUploadSuccess(false);
     setError(null);
+    // Reset the file input DOM element
+    if (fileInputRef.current) {
+      fileInputRef.current.value = '';
+    }
     onClose();
   };
 
@@ -91,11 +97,10 @@ const AIUploadModal = ({ isOpen, onClose }) => {
 
         {/* Título */}
         <h2 className="text-2xl font-bold mb-4">
-          {uploadSuccess ? '¡Foto subida con éxito!' : 'Personaliza tu experiencia'}
+          Personaliza tu experiencia
         </h2>
         
-        {!uploadSuccess ? (
-          <>
+        <>
             <p className="text-gray-600 mb-6">
               Sube tu foto para que podamos crear imágenes personalizadas de productos que se ajusten a tu estilo.
             </p>
@@ -133,6 +138,7 @@ const AIUploadModal = ({ isOpen, onClose }) => {
                   </span>
                 </div>
                 <input
+                  ref={fileInputRef}
                   id="photo-upload"
                   type="file"
                   className="hidden"
@@ -168,52 +174,6 @@ const AIUploadModal = ({ isOpen, onClose }) => {
               </button>
             </div>
           </>
-        ) : (
-          <>
-            {/* Estado después de subir */}
-            <p className="text-gray-600 mb-6">
-              Tu foto ha sido subida correctamente. Ahora puedes generar recomendaciones personalizadas basadas en tu estilo.
-            </p>
-
-            {/* Error message */}
-            {error && (
-              <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-md">
-                <p className="text-sm text-red-600">{error}</p>
-              </div>
-            )}
-
-            {/* Preview de la foto subida */}
-            {previewUrl && (
-              <div className="mb-6">
-                <img
-                  src={previewUrl}
-                  alt="Foto subida"
-                  className="w-full h-64 object-cover rounded-lg"
-                />
-              </div>
-            )}
-
-            {/* Icono de éxito */}
-            <div className="flex justify-center mb-6">
-              <div className="bg-green-100 rounded-full p-3">
-                <svg className="w-8 h-8 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                </svg>
-              </div>
-            </div>
-
-            {/* Botón de generar recomendaciones */}
-            <button
-              onClick={handleGenerateRecommendations}
-              className="w-full px-4 py-3 bg-black text-white rounded-md hover:bg-gray-800 transition-colors flex items-center justify-center gap-2"
-            >
-              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
-              </svg>
-              Generar Recomendaciones
-            </button>
-          </>
-        )}
       </div>
     </div>
   );

@@ -1,20 +1,26 @@
 import { createContext, useState, useEffect, useCallback } from 'react';
-import { useSelector } from 'react-redux';
+import { useSelector, useDispatch } from 'react-redux';
 import { jwtDecode } from 'jwt-decode';
 import { selectIsAuthenticated, selectCurrentToken } from '../store/slices/authSlice';
 import { useUploadUserImagesMutation } from '../store/services/airisLoaderApi';
-import { useCustomizeProductByUserMutation, useGetCatalogProductsQuery } from '../store/services/airisApi';
+import { 
+  useCustomizeProductByUserMutation, 
+  useGetLatestUserMoodQuery,
+  useGetSuggestedProductsQuery,
+  airisApi
+} from '../store/services/airisApi';
 
 const AIContext = createContext();
 
 const AI_STORAGE_KEYS = {
-  STATUS: 'ai_status', // idle | uploading | uploaded | generating | completed
+  STATUS: 'ai_status', // idle | uploading | fetching_mood | products_ready | generating | completed
   PHOTO_UPLOADED: 'ai_photo_uploaded',
   COMPLETED: 'ai_completed',
   DISMISSED: 'ai_notification_dismissed'
 };
 
 export const AIProvider = ({ children }) => {
+  const dispatch = useDispatch();
   const isAuthenticated = useSelector(selectIsAuthenticated);
   const token = useSelector(selectCurrentToken);
   const [aiStatus, setAiStatus] = useState('idle');
@@ -22,14 +28,26 @@ export const AIProvider = ({ children }) => {
   const [progress, setProgress] = useState({ current: 0, total: 0 });
   const [showNotification, setShowNotification] = useState(true);
   const [generatedImages, setGeneratedImages] = useState([]);
+  const [shouldFetchMood, setShouldFetchMood] = useState(false);
 
   // API hooks
   const [uploadUserImages] = useUploadUserImagesMutation();
   const [customizeProduct] = useCustomizeProductByUserMutation();
   
-  // Get catalog products for generation
-  const { data: catalogProducts } = useGetCatalogProductsQuery(undefined, {
-    skip: !isAuthenticated,
+  // Get user mood after upload
+  const {
+    data: userMood,
+    isLoading: isMoodLoading
+  } = useGetLatestUserMoodQuery(undefined, {
+    skip: !shouldFetchMood || !isAuthenticated,
+  });
+
+  // Get suggested products based on mood
+  const { 
+    data: suggestedProducts,
+    isLoading: isSuggestedProductsLoading 
+  } = useGetSuggestedProductsQuery(userMood?.related_products_query || '', {
+    skip: !userMood?.related_products_query,
   });
 
   // Cargar estado desde localStorage al montar
@@ -91,9 +109,12 @@ export const AIProvider = ({ children }) => {
         images: [file]
       }).unwrap();
 
-      // Cambiar a estado 'uploaded'
-      setAiStatus('uploaded');
-      localStorage.setItem(AI_STORAGE_KEYS.STATUS, 'uploaded');
+      console.log('✅ Image uploaded successfully, fetching mood...');
+
+      // Trigger mood fetch after successful upload
+      setShouldFetchMood(true);
+      setAiStatus('fetching_mood');
+      localStorage.setItem(AI_STORAGE_KEYS.STATUS, 'fetching_mood');
       localStorage.setItem(AI_STORAGE_KEYS.PHOTO_UPLOADED, 'true');
     } catch (error) {
       console.error('Error uploading photo:', error);
@@ -102,8 +123,8 @@ export const AIProvider = ({ children }) => {
     }
   }, [uploadUserImages, getUserIdFromToken]);
 
-  const generateRecommendations = useCallback(async () => {
-    if (!catalogProducts || catalogProducts.length === 0) {
+  const generateRecommendations = useCallback(async (productsToCustomize) => {
+    if (!productsToCustomize || productsToCustomize.length === 0) {
       throw new Error('No hay productos disponibles para personalizar');
     }
 
@@ -112,17 +133,20 @@ export const AIProvider = ({ children }) => {
       throw new Error('Usuario no identificado');
     }
 
+    console.log('🎨 Starting product customization for', productsToCustomize.length, 'products');
     setAiStatus('generating');
-    setProgress({ current: 0, total: catalogProducts.length });
+    setProgress({ current: 0, total: productsToCustomize.length });
     setGeneratedImages([]);
 
     const images = [];
 
     try {
-      // Personalizar cada producto en paralelo
-      const promises = catalogProducts.map(async (product) => {
+      // Personalizar cada producto secuencialmente para mejor UX
+      for (let i = 0; i < productsToCustomize.length; i++) {
+        const product = productsToCustomize[i];
         try {
-          // Usar el userId real
+          console.log(`🎨 Customizing product ${i + 1}/${productsToCustomize.length}: ${product.product_name}`);
+          
           const result = await customizeProduct({ 
             productId: product.product_id, 
             userId: userId 
@@ -132,41 +156,63 @@ export const AIProvider = ({ children }) => {
           const productImages = result.product_images_urls || result.images || [];
           const lastImage = productImages[productImages.length - 1] || productImages[0];
           
-          setProgress(prev => ({ ...prev, current: prev.current + 1 }));
-          
-          return {
+          const generatedImage = {
             productId: product.product_id,
             productName: product.product_name,
             image: lastImage,
             originalProduct: product
           };
+          
+          images.push(generatedImage);
+          setGeneratedImages([...images]);
+          setProgress(prev => ({ ...prev, current: prev.current + 1 }));
+          
+          console.log(`✅ Product ${i + 1} customized successfully`);
         } catch (err) {
           console.error(`Error personalizando producto ${product.product_id}:`, err);
           setProgress(prev => ({ ...prev, current: prev.current + 1 }));
-          return null;
         }
-      });
+      }
 
-      const results = await Promise.all(promises);
-      const validImages = results.filter(r => r !== null);
-
-      console.log('✅ Generation completed. Valid images:', validImages.length);
-      setGeneratedImages(validImages);
+      console.log('✅ Generation completed. Valid images:', images.length);
 
       // Guardar las imágenes en localStorage para que persistan entre recargas
-      if (validImages.length > 0) {
-        localStorage.setItem('aiGeneratedImages', JSON.stringify(validImages));
-        console.log('📝 localStorage updated with', validImages.length, 'images');
-        completeProcessing(validImages);
+      if (images.length > 0) {
+        localStorage.setItem('aiGeneratedImages', JSON.stringify(images));
+        console.log('📝 localStorage updated with', images.length, 'images');
+        completeProcessing(images);
       } else {
         throw new Error('No se pudieron generar recomendaciones personalizadas');
       }
     } catch (err) {
       console.error('Error generando recomendaciones:', err);
-      setAiStatus('uploaded'); // Volver al estado anterior
+      setAiStatus('uploaded');
       throw err;
     }
-  }, [catalogProducts, customizeProduct]);
+  }, [customizeProduct, getUserIdFromToken]);
+
+  // When products are ready, change status to show CTA instead of auto-starting
+  useEffect(() => {
+    if (aiStatus === 'fetching_mood' && suggestedProducts && !isSuggestedProductsLoading && userMood) {
+      console.log('✅ Mood and suggested products ready!');
+      console.log('📋 Mood phrase:', userMood.mood_phrase);
+      console.log('🔍 Related products query:', userMood.related_products_query);
+      console.log('📦 Suggested products count:', suggestedProducts.length);
+      
+      // Set status to products_ready to show CTA button
+      setAiStatus('products_ready');
+      localStorage.setItem(AI_STORAGE_KEYS.STATUS, 'products_ready');
+    }
+  }, [aiStatus, suggestedProducts, isSuggestedProductsLoading, userMood]);
+
+  // Function to start customization when user clicks CTA
+  const startCustomization = useCallback(() => {
+    if (suggestedProducts && suggestedProducts.length > 0) {
+      generateRecommendations(suggestedProducts).catch(err => {
+        console.error('Error in customization:', err);
+      });
+    }
+  }, [suggestedProducts, generateRecommendations]);
 
   const completeProcessing = (images) => {
     console.log('🎉 completeProcessing called with', images?.length, 'images');
@@ -193,11 +239,27 @@ export const AIProvider = ({ children }) => {
     setProgress({ current: 0, total: 0 });
     setGeneratedImages([]);
     setShowNotification(true);
+    setShouldFetchMood(false);
     
-    // Limpiar localStorage
+    // Limpiar TODO el estado de AI en localStorage
+    localStorage.removeItem(AI_STORAGE_KEYS.STATUS);
+    localStorage.removeItem(AI_STORAGE_KEYS.PHOTO_UPLOADED);
+    localStorage.removeItem(AI_STORAGE_KEYS.COMPLETED);
     localStorage.removeItem(AI_STORAGE_KEYS.DISMISSED);
+    localStorage.removeItem('aiGeneratedImages');
     sessionStorage.removeItem('ai_generated_images');
-  }, []);
+    
+    // Invalidar cache de RTK Query para mood y productos
+    dispatch(airisApi.util.invalidateTags(['UserMood', 'Products']));
+    
+    console.log('🧹 AI state completely reset including RTK Query cache');
+  }, [dispatch]);
+
+  // Create a map of productId -> customized image URL for easy lookup
+  const customizedImagesMap = generatedImages.reduce((acc, img) => {
+    acc[img.productId] = img.image;
+    return acc;
+  }, {});
 
   return (
     <AIContext.Provider value={{
@@ -206,8 +268,10 @@ export const AIProvider = ({ children }) => {
       progress,
       showNotification,
       generatedImages,
+      customizedImagesMap,
       uploadPhoto,
       generateRecommendations,
+      startCustomization,
       resetAIState,
       dismissNotification
     }}>

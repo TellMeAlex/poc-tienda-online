@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useDispatch, useSelector } from 'react-redux';
 import { useGetCatalogProductsQuery, useCustomizeProductByUserMutation } from '../store/services/airisApi';
@@ -15,12 +15,50 @@ const ProductDetail = () => {
   const [selectedColor, setSelectedColor] = useState('');
   const [quantity, setQuantity] = useState(1);
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
+  const [aiGeneratedImages, setAiGeneratedImages] = useState([]);
 
   // Fetch all products and find the one we need
   const { data: products, isLoading, error } = useGetCatalogProductsQuery();
   const [customizeProduct, { isLoading: isCustomizing }] = useCustomizeProductByUserMutation();
 
   const product = products?.find(p => p.product_id === parseInt(id));
+
+  // Load AI-generated images from localStorage and filter for current product
+  useEffect(() => {
+    const loadAIGeneratedImages = () => {
+      try {
+        const generatedImagesStr = localStorage.getItem('aiGeneratedImages');
+        if (generatedImagesStr) {
+          const generatedImages = JSON.parse(generatedImagesStr);
+          
+          // Filter images for the current product
+          const currentProductImages = generatedImages.filter(
+            img => img.productId === parseInt(id)
+          );
+          
+          if (currentProductImages.length > 0) {
+            // Convert AI-generated images to the expected format
+            const formattedImages = currentProductImages.map(img => {
+              const isAbsoluteUrl = img.image.startsWith('http');
+              return isAbsoluteUrl 
+                ? img.image 
+                : `https://airis-api-711296505139.europe-southwest1.run.app/image/${img.image}`;
+            });
+            
+            setAiGeneratedImages(formattedImages);
+            // Reset current image index when AI images are loaded
+            setCurrentImageIndex(0);
+          }
+        }
+      } catch (error) {
+        console.error('Error loading AI-generated images:', error);
+      }
+    };
+
+    if (id) {
+      loadAIGeneratedImages();
+    }
+  }, [id]);
 
   const handleAddToCart = () => {
     if (!product) return;
@@ -79,8 +117,13 @@ const ProductDetail = () => {
     );
   }
 
-  const images = product.product_images_urls || [];
-  const currentImage = images[currentImageIndex] || '/placeholder-image.jpg';
+  // Combine AI-generated images with catalog images, prioritizing AI-generated ones
+  const catalogImages = product.product_images_urls || [];
+  const allImages = aiGeneratedImages.length > 0 ? [...aiGeneratedImages, ...catalogImages] : catalogImages;
+  const currentImage = allImages[currentImageIndex] || '/placeholder-image.jpg';
+  
+  // Check if current image is AI-generated
+  const isCurrentImageAI = aiGeneratedImages.length > 0 && currentImageIndex < aiGeneratedImages.length;
 
   // Mock sizes and colors (you can enhance this based on product characteristics)
   const sizes = ['XS', 'S', 'M', 'L', 'XL'];
@@ -92,32 +135,52 @@ const ProductDetail = () => {
         {/* Galería de imágenes */}
         <div>
           {/* Imagen principal */}
-          <div className="aspect-[3/4] bg-gray-200 mb-4 overflow-hidden">
+          <div className="aspect-[3/4] bg-gray-200 mb-4 overflow-hidden relative">
             <img
               src={currentImage}
               alt={product.product_name}
               className="w-full h-full object-cover"
             />
+            {/* AI-generated badge */}
+            {isCurrentImageAI && (
+              <div className="absolute top-3 left-3 bg-gradient-to-r from-purple-600 to-pink-600 text-white px-3 py-1 rounded-full text-xs font-semibold flex items-center gap-1">
+                <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
+                  <path fillRule="evenodd" d="M11.49 3.17c-.38-1.56-2.6-1.56-2.98 0a1.532 1.532 0 01-2.286.948c-1.372-.836-2.942.734-2.106 2.106.54.886.061 2.042-.947 2.287-1.561.379-1.561 2.6 0 2.978a1.532 1.532 0 01.947 2.287c-.836 1.372.734 2.942 2.106 2.106a1.532 1.532 0 012.287.947c.379 1.561 2.6 1.561 2.978 0a1.533 1.533 0 012.287-.947c1.372.836 2.942-.734 2.106-2.106a1.533 1.533 0 01.947-2.287c1.561-.379 1.561-2.6 0-2.978a1.532 1.532 0 01-.947-2.287c.836-1.372-.734-2.942-2.106-2.106a1.532 1.532 0 01-2.287-.947zM10 13a3 3 0 100-6 3 3 0 000 6z" clipRule="evenodd" />
+                </svg>
+                AI fitting room
+              </div>
+            )}
           </div>
 
           {/* Miniaturas */}
-          {images.length > 1 && (
+          {allImages.length > 1 && (
             <div className="grid grid-cols-4 gap-2">
-              {images.map((img, index) => (
-                <button
-                  key={index}
-                  onClick={() => setCurrentImageIndex(index)}
-                  className={`aspect-square bg-gray-200 overflow-hidden border-2 ${
-                    currentImageIndex === index ? 'border-black' : 'border-transparent'
-                  }`}
-                >
-                  <img
-                    src={img}
-                    alt={`${product.product_name} ${index + 1}`}
-                    className="w-full h-full object-cover"
-                  />
-                </button>
-              ))}
+              {allImages.map((img, index) => {
+                const isAIImage = index < aiGeneratedImages.length;
+                return (
+                  <button
+                    key={index}
+                    onClick={() => setCurrentImageIndex(index)}
+                    className={`aspect-square bg-gray-200 overflow-hidden border-2 relative ${
+                      currentImageIndex === index ? 'border-black' : 'border-transparent'
+                    }`}
+                  >
+                    <img
+                      src={img}
+                      alt={`${product.product_name} ${index + 1}`}
+                      className="w-full h-full object-cover"
+                    />
+                    {/* Small AI indicator for thumbnails */}
+                    {isAIImage && (
+                      <div className="absolute top-1 right-1 bg-gradient-to-r from-purple-600 to-pink-600 rounded-full p-1">
+                        <svg className="w-2 h-2 text-white" fill="currentColor" viewBox="0 0 20 20">
+                          <path fillRule="evenodd" d="M11.49 3.17c-.38-1.56-2.6-1.56-2.98 0a1.532 1.532 0 01-2.286.948c-1.372-.836-2.942.734-2.106 2.106.54.886.061 2.042-.947 2.287-1.561.379-1.561 2.6 0 2.978a1.532 1.532 0 01.947 2.287c-.836 1.372.734 2.942 2.106 2.106a1.532 1.532 0 012.287.947c.379 1.561 2.6 1.561 2.978 0a1.533 1.533 0 012.287-.947c1.372.836 2.942-.734 2.106-2.106a1.533 1.533 0 01.947-2.287c1.561-.379 1.561-2.6 0-2.978a1.532 1.532 0 01-.947-2.287c.836-1.372-.734-2.942-2.106-2.106a1.532 1.532 0 01-2.287-.947zM10 13a3 3 0 100-6 3 3 0 000 6z" clipRule="evenodd" />
+                        </svg>
+                      </div>
+                    )}
+                  </button>
+                );
+              })}
             </div>
           )}
         </div>
