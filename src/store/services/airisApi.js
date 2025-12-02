@@ -36,12 +36,14 @@ export const airisApi = createApi({
         params: { query: searchQuery },
       }),
       providesTags: ['Products'],
+      keepUnusedDataFor: 300, // Keep cache for 5 minutes
     }),
 
     // Get latest user mood
     getLatestUserMood: builder.query({
       query: () => '/operation/latest-user-mood',
       providesTags: ['UserMood'],
+      keepUnusedDataFor: 300, // Keep cache for 5 minutes
     }),
 
     // Customize product by user (personalized images)

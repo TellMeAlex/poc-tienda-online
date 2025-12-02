@@ -16,7 +16,8 @@ const AI_STORAGE_KEYS = {
   STATUS: 'ai_status', // idle | uploading | fetching_mood | products_ready | generating | completed
   PHOTO_UPLOADED: 'ai_photo_uploaded',
   COMPLETED: 'ai_completed',
-  DISMISSED: 'ai_notification_dismissed'
+  DISMISSED: 'ai_notification_dismissed',
+  HAS_RECOMMENDATIONS: 'ai_has_recommendations'
 };
 
 export const AIProvider = ({ children }) => {
@@ -29,6 +30,7 @@ export const AIProvider = ({ children }) => {
   const [showNotification, setShowNotification] = useState(true);
   const [generatedImages, setGeneratedImages] = useState([]);
   const [shouldFetchMood, setShouldFetchMood] = useState(false);
+  const [hasRecommendations, setHasRecommendations] = useState(false);
 
   // API hooks
   const [uploadUserImages] = useUploadUserImagesMutation();
@@ -58,6 +60,7 @@ export const AIProvider = ({ children }) => {
     const storedPhotoUploaded = localStorage.getItem(AI_STORAGE_KEYS.PHOTO_UPLOADED);
     const storedCompleted = localStorage.getItem(AI_STORAGE_KEYS.COMPLETED);
     const storedDismissed = localStorage.getItem(AI_STORAGE_KEYS.DISMISSED);
+    const storedHasRecommendations = localStorage.getItem(AI_STORAGE_KEYS.HAS_RECOMMENDATIONS);
 
     if (storedDismissed === 'true') {
       setShowNotification(false);
@@ -75,6 +78,10 @@ export const AIProvider = ({ children }) => {
 
     if (storedCompleted === 'true') {
       setAiStatus('completed');
+    }
+
+    if (storedHasRecommendations === 'true') {
+      setHasRecommendations(true);
     }
   }, []);
 
@@ -203,12 +210,20 @@ export const AIProvider = ({ children }) => {
       console.log('📋 Mood phrase:', userMood.mood_phrase);
       console.log('🔍 Related products query:', userMood.related_products_query);
       console.log('📦 Suggested products count:', suggestedProducts.length);
-      
+
       // Set status to products_ready to show CTA button
       setAiStatus('products_ready');
       localStorage.setItem(AI_STORAGE_KEYS.STATUS, 'products_ready');
     }
   }, [aiStatus, suggestedProducts, isSuggestedProductsLoading, userMood]);
+
+  // Set hasRecommendations flag when user has active recommendations
+  useEffect(() => {
+    if (aiStatus === 'products_ready' || aiStatus === 'generating' || aiStatus === 'completed') {
+      setHasRecommendations(true);
+      localStorage.setItem(AI_STORAGE_KEYS.HAS_RECOMMENDATIONS, 'true');
+    }
+  }, [aiStatus]);
 
   // Function to start customization when user clicks CTA
   const startCustomization = useCallback(() => {
@@ -245,18 +260,20 @@ export const AIProvider = ({ children }) => {
     setGeneratedImages([]);
     setShowNotification(true);
     setShouldFetchMood(false);
-    
+    setHasRecommendations(false);
+
     // Limpiar TODO el estado de AI en localStorage
     localStorage.removeItem(AI_STORAGE_KEYS.STATUS);
     localStorage.removeItem(AI_STORAGE_KEYS.PHOTO_UPLOADED);
     localStorage.removeItem(AI_STORAGE_KEYS.COMPLETED);
     localStorage.removeItem(AI_STORAGE_KEYS.DISMISSED);
+    localStorage.removeItem(AI_STORAGE_KEYS.HAS_RECOMMENDATIONS);
     localStorage.removeItem('aiGeneratedImages');
     sessionStorage.removeItem('ai_generated_images');
-    
+
     // Invalidar cache de RTK Query para mood y productos
     dispatch(airisApi.util.invalidateTags(['UserMood', 'Products']));
-    
+
     console.log('🧹 AI state completely reset including RTK Query cache');
   }, [dispatch]);
 
@@ -274,6 +291,7 @@ export const AIProvider = ({ children }) => {
       showNotification,
       generatedImages,
       customizedImagesMap,
+      hasRecommendations,
       uploadPhoto,
       generateRecommendations,
       startCustomization,
