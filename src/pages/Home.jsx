@@ -16,20 +16,17 @@ const Home = () => {
   const [searchParams] = useSearchParams();
   const search = searchParams.get('search');
   const isAuthenticated = useSelector(selectIsAuthenticated);
-  const { customizedImagesMap, aiStatus } = useAI();
+  const { customizedImagesMap, hasRecommendations } = useAI();
+
+  // Show mood-based products if user has active recommendations
+  const shouldShowMoodProducts = isAuthenticated && hasRecommendations;
   
-  // Only show mood and products AFTER user clicks CTA button
-  // Not when products_ready (that's when CTA is shown, not clicked yet)
-  const shouldShowMoodProducts = isAuthenticated && 
-    (aiStatus === 'generating' || aiStatus === 'completed');
-  
-  // Get user mood (only after user clicks CTA to view results)
+  // Get user mood (uses persistent hasRecommendations flag)
   const {
     data: userMood,
     isLoading: isMoodLoading
   } = useGetLatestUserMoodQuery(undefined, {
     skip: !shouldShowMoodProducts || !!search,
-    refetchOnMountOrArgChange: true,
   });
 
   // Typewriter effect for mood phrase (0.5s delay between characters)
