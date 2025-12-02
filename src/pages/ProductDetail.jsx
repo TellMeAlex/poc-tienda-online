@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import { useDispatch, useSelector } from 'react-redux';
 import { useGetCatalogProductsQuery, useCustomizeProductByUserMutation } from '../store/services/airisApi';
 import { addToCart } from '../store/slices/cartSlice';
@@ -8,14 +8,16 @@ import { selectIsAuthenticated } from '../store/slices/authSlice';
 const ProductDetail = () => {
   const { id } = useParams();
   const navigate = useNavigate();
+  const location = useLocation();
   const dispatch = useDispatch();
   const isAuthenticated = useSelector(selectIsAuthenticated);
-  
+
   const [selectedSize, setSelectedSize] = useState('');
   const [selectedColor, setSelectedColor] = useState('');
   const [quantity, setQuantity] = useState(1);
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
   const [aiGeneratedImages, setAiGeneratedImages] = useState([]);
+  const [generatedImageFromArmario, setGeneratedImageFromArmario] = useState(null);
 
   // Fetch all products and find the one we need
   const { data: products, isLoading, error } = useGetCatalogProductsQuery();
@@ -59,6 +61,15 @@ const ProductDetail = () => {
       loadAIGeneratedImages();
     }
   }, [id]);
+
+  // Load generated image from location.state (when navigating from ArmarioConIA)
+  useEffect(() => {
+    if (location.state?.generatedImageUrl) {
+      setGeneratedImageFromArmario(location.state.generatedImageUrl);
+      // Set this image as the first one to display
+      setCurrentImageIndex(0);
+    }
+  }, [location.state]);
 
   const handleAddToCart = () => {
     if (!product) return;
@@ -119,11 +130,20 @@ const ProductDetail = () => {
 
   // Combine AI-generated images with catalog images, prioritizing AI-generated ones
   const catalogImages = product.product_images_urls || [];
-  const allImages = aiGeneratedImages.length > 0 ? [...aiGeneratedImages, ...catalogImages] : catalogImages;
+
+  // If there's a generated image from ArmarioConIA, prioritize it as the first image
+  let allImages;
+  if (generatedImageFromArmario) {
+    allImages = [generatedImageFromArmario, ...aiGeneratedImages.filter(img => img !== generatedImageFromArmario), ...catalogImages];
+  } else {
+    allImages = aiGeneratedImages.length > 0 ? [...aiGeneratedImages, ...catalogImages] : catalogImages;
+  }
+
   const currentImage = allImages[currentImageIndex] || '/placeholder-image.jpg';
-  
+
   // Check if current image is AI-generated
-  const isCurrentImageAI = aiGeneratedImages.length > 0 && currentImageIndex < aiGeneratedImages.length;
+  const isCurrentImageAI = (generatedImageFromArmario && currentImageIndex === 0) ||
+                           (aiGeneratedImages.length > 0 && currentImageIndex < (generatedImageFromArmario ? aiGeneratedImages.length + 1 : aiGeneratedImages.length));
 
   // Mock sizes and colors (you can enhance this based on product characteristics)
   const sizes = ['XS', 'S', 'M', 'L', 'XL'];

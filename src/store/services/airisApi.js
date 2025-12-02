@@ -66,6 +66,12 @@ export const airisApi = createApi({
     getImage: builder.query({
       query: (imagePath) => `/image/${imagePath}`,
     }),
+
+    // Get all user generations
+    getAllUserGenerations: builder.query({
+      query: () => '/operation/get-all-user-generations',
+      providesTags: ['Products'],
+    }),
   }),
 });
 
@@ -76,4 +82,5 @@ export const {
   useCustomizeProductByUserMutation,
   useGetCatalogProductsQuery,
   useGetImageQuery,
+  useGetAllUserGenerationsQuery,
 } = airisApi;
